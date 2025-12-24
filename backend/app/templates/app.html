@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RegressAI — Evaluation Console</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- LEFT SIDEBAR: Cases & Versions -->
+    <aside class="cases-sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="logo">🧠</div>
+          <div>
+            <h1>RegressAI</h1>
+            <div class="small">Version Control for LLMs</div>
+          </div>
+        </div>
+        
+        <button class="btn primary btn-new-case" onclick="createNewCase()">
+          + New Case
+        </button>
+      </div>
+
+      <div id="casesList" class="cases-list">
+        <!-- Cases will be rendered here -->
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading cases...</p>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="btn alt btn-settings" onclick="openSettings()">
+          <span class="btn-icon">⚙️</span>
+          Settings
+        </button>
+        <button class="btn alt btn-logout" onclick="logout()">Logout</button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <!-- SETUP PANEL -->
+      <section class="setup-panel">
+        <div class="panel">
+          <h3>Evaluation Setup</h3>
+
+          <div class="input-grid">
+            <div class="input-group">
+              <label>Old API URL</label>
+              <input id="oldApi" placeholder="http://127.0.0.1:8000/mock/old-legal-ai" value="http://127.0.0.1:8000/mock/old-legal-ai">
+            </div>
+
+            <div class="input-group">
+              <label>New API URL</label>
+              <input id="newApi" placeholder="http://127.0.0.1:8000/mock/new-legal-ai" value="http://127.0.0.1:8000/mock/new-legal-ai">
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Environment Variables (JSON)</label>
+            <textarea id="envVars" rows="2" placeholder='{"API_KEY":"xxx"}'>{}</textarea>
+          </div>
+
+          <div class="input-group">
+            <label>Request Body Template</label>
+            <textarea id="bodyTemplate" rows="2" placeholder='Use {{question}} when generating questions'>{ "prompt": "{{question}}" }</textarea>
+            <div class="hint">Keep <code>{{question}}</code> for auto-generated questions</div>
+          </div>
+
+          <div class="input-grid">
+            <div class="input-group">
+              <label>Response Path</label>
+              <input id="responsePath" value="choices[0].message.content">
+            </div>
+
+            <div class="input-group">
+              <label>Number of Test Cases</label>
+              <input id="numCases" type="number" value="3" min="1" max="20">
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>System Goal</label>
+            <textarea id="goal" rows="2">Explain Indian income tax safely with legal caveats.</textarea>
+          </div>
+
+          <div class="input-grid">
+            <div class="input-group">
+              <label>Old Prompt / Architecture</label>
+              <textarea id="oldPrompt" rows="3" placeholder="e.g. Old prompt: include assumptions and disclaimers"></textarea>
+            </div>
+
+            <div class="input-group">
+              <label>New Prompt / Architecture</label>
+              <textarea id="newPrompt" rows="3" placeholder="e.g. New prompt: direct answers, no disclaimers"></textarea>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Manual Questions (optional, one per line)</label>
+            <textarea id="questionsManual" rows="3" placeholder="Leave empty to auto-generate"></textarea>
+          </div>
+
+          <div class="action-bar">
+            <button class="btn primary btn-analyze" onclick="runAnalysis()">
+              <span class="btn-icon">⚡</span>
+              Analyze
+            </button>
+            <span class="btn-hint">Change any input to run a new version</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- RESULTS PANEL -->
+      <section class="results-panel">
+        <div class="topbar">
+          <div id="runId" class="run-id">No version selected</div>
+          <div id="statusText" class="status">Idle</div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="summary" onclick="showTab(event)">
+            <span class="tab-icon">📊</span>
+            Summary
+          </button>
+          <button class="tab-btn" data-tab="diff" onclick="showTab(event)">
+            <span class="tab-icon">🔍</span>
+            Diff
+          </button>
+          <button class="tab-btn" data-tab="suggest" onclick="showTab(event)">
+            <span class="tab-icon">💡</span>
+            Insights
+          </button>
+          <button class="tab-btn" data-tab="snapshot" onclick="showTab(event)">
+            <span class="tab-icon">📸</span>
+            Snapshot
+          </button>
+        </div>
+
+        <div class="content">
+          <div id="tab-summary" class="tab pane active">
+            <h2>Summary</h2>
+            <div id="summaryCard" class="card">
+              <p class="muted">Run analysis to see results</p>
+            </div>
+
+            <div class="card help-card">
+              <h4>How to read these results</h4>
+              <ul class="help-list">
+                <li>
+                  <strong>Verdict (Improved / Regression)</strong> is a <em>comparison</em> between NEW and OLD.
+                  <br>
+                  <span class="muted">
+                    “Regression” means NEW introduces higher risk than OLD — even if parts of it look better.
+                  </span>
+                </li>
+
+                <li>
+                  <strong>Cookedness</strong> is an <em>absolute risk score</em>.
+                  <br>
+                  <span class="muted">
+                    Low cookedness = generally safe output. High cookedness = misleading, unsafe, or legally risky output.
+                  </span>
+                </li>
+
+                <li>
+                  <strong>Quality and Safety are judged separately.</strong>
+                  <br>
+                  <span class="muted">
+                    NEW can be higher quality but still marked as Regression if safety worsens.
+                  </span>
+                </li>
+
+                <li>
+                  <strong>Rule of thumb:</strong>
+                  <br>
+                  <span class="muted">
+                    Verdict answers “Is NEW better than OLD?”  
+                    Cookedness answers “How dangerous is this output?”
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+
+          </div>
+
+          <div id="tab-diff" class="tab pane">
+            <h2>Deterministic Diff</h2>
+            <div id="detFlags" class="card small">—</div>
+            <div id="llmFlags" class="card small">—</div>
+            <h3>Old / New Examples</h3>
+            <div class="side-by-side">
+              <div>
+                <h4>Old API</h4>
+                <pre id="oldSample"></pre>
+              </div>
+              <div>
+                <h4>New API</h4>
+                <pre id="newSample"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div id="tab-suggest" class="tab pane">
+            <h2>Insights & Fixes</h2>
+            <div id="insightSummary" class="card"></div>
+
+            <h3>Why this happened</h3>
+            <div id="insightReview" class="card"></div>
+
+            <h3>Key Findings</h3>
+            <ul id="insightFindings" class="card-list"></ul>
+
+            <h3>Actionable Suggestions</h3>
+            <div id="insightSuggestions" class="cards-list"></div>
+
+            <div id="revisedPromptContainer" class="card">
+              <h3>Revised Prompt</h3>
+              <textarea id="revisedPrompt" rows="8" placeholder="Revised prompt will appear here"></textarea>
+            </div>
+
+            <h3>Quick Tests</h3>
+            <ul id="quickTests" class="card-list"></ul>
+
+            <h3>Metrics to Watch</h3>
+            <ul id="metrics" class="card-list"></ul>
+          </div>
+
+          <div id="tab-snapshot" class="tab pane">
+            <h2>Snapshot</h2>
+            <pre id="snapshot" class="card pre"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="modal-close" onclick="closeSettings()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>Gemini API Key</label>
+          <input type="password" id="geminiApiKey" placeholder="Enter your Gemini API key">
+          <div class="hint">
+            Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>
+          </div>
+          <div id="apiKeyStatus" class="api-key-status"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn alt" onclick="closeSettings()">Cancel</button>
+        <button class="btn primary" onclick="saveSettings()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase Auth (inline) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "",
+      authDomain: "techsprint-32cd2.firebaseapp.com",
+      projectId: "techsprint-32cd2",
+      storageBucket: "techsprint-32cd2.firebasestorage.app",
+      messagingSenderId: "865435723706",
+      appId: "1:865435723706:web:91831746297d784698df83"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    window.firebaseAuth = auth;
+    window.firebaseProvider = provider;
+    window.firebaseSignIn = () => signInWithPopup(auth, provider);
+    window.firebaseSignOut = () => signOut(auth);
+
+    onAuthStateChanged(auth, (user) => {
+      window.currentUser = user || null;
+      document.dispatchEvent(new CustomEvent("auth-changed"));
+    });
+  </script>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

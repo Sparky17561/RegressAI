@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RegressAI - Stop Guessing if Your Prompt Change Broke Production</title>
+  <style>
+    :root {
+      --bg: #071018;
+      --accent: #39d6a2;
+      --accent-2: #1cc88f;
+      --text: #e6fdf3;
+      --muted: #9bd6c9;
+      --card: #0f1b1a;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(180deg, #031719 0%, var(--bg) 100%);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+    
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 40px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at center, rgba(57,214,162,0.08) 0%, transparent 70%);
+      animation: pulse 8s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.3; }
+      50% { transform: scale(1.1); opacity: 0.6; }
+    }
+    
+    .hero-content {
+      position: relative;
+      z-index: 10;
+      max-width: 900px;
+    }
+    
+    .logo-large {
+      width: 100px;
+      height: 100px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      margin: 0 auto 30px;
+      box-shadow: 0 20px 60px rgba(57,214,162,0.4);
+      animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    h1 {
+      font-size: 56px;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, var(--text), var(--accent));
+      --webkit-background-clip: text;
+      --webkit-text-fill-color: transparent;
+      animation: slideUp 0.8s ease-out;
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .subtext {
+      font-size: 20px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      line-height: 1.6;
+      animation: slideUp 0.8s ease-out 0.2s both;
+    }
+    
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      animation: slideUp 0.8s ease-out 0.4s both;
+    }
+    
+    .btn {
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s;
+      cursor: pointer;
+      border: none;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #012219;
+      box-shadow: 0 8px 24px rgba(57,214,162,0.4);
+    }
+    
+    .btn-primary:hover {
+      box-shadow: 0 12px 32px rgba(57,214,162,0.6);
+      transform: translateY(-2px);
+    }
+    
+    .btn-secondary {
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border: 1px solid rgba(57,214,162,0.2);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(57,214,162,0.1);
+      border-color: var(--accent);
+    }
+    
+    .features {
+      padding: 100px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .features h2 {
+      font-size: 40px;
+      text-align: center;
+      margin-bottom: 60px;
+      color: var(--accent);
+    }
+    
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+    }
+    
+    .feature-card {
+      background: linear-gradient(135deg, rgba(57,214,162,0.05), rgba(28,200,143,0.02));
+      padding: 32px;
+      border-radius: 16px;
+      border: 1px solid rgba(57,214,162,0.1);
+      transition: all 0.3s;
+    }
+    
+    .feature-card:hover {
+      transform: translateY(-8px);
+      border-color: rgba(57,214,162,0.3);
+      box-shadow: 0 12px 40px rgba(57,214,162,0.2);
+    }
+    
+    .feature-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    
+    .feature-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    
+    .feature-desc {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    
+    .visual-flow {
+      padding: 100px 20px;
+      text-align: center;
+      background: rgba(0,0,0,0.3);
+    }
+    
+    .visual-flow h2 {
+      font-size: 40px;
+      margin-bottom: 60px;
+      color: var(--accent);
+    }
+    
+    .flow-diagram {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .flow-box {
+      background: linear-gradient(135deg, var(--card), rgba(15,27,26,0.5));
+      padding: 24px 32px;
+      border-radius: 12px;
+      border: 2px solid rgba(57,214,162,0.2);
+      min-width: 150px;
+      transition: all 0.3s;
+    }
+    
+    .flow-box:hover {
+      transform: scale(1.05);
+      border-color: var(--accent);
+    }
+    
+    .flow-arrow {
+      font-size: 32px;
+      color: var(--accent);
+    }
+    
+    .flow-title {
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+    
+    .flow-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+    
+    footer {
+      padding: 40px 20px;
+      text-align: center;
+      border-top: 1px solid rgba(57,214,162,0.1);
+      color: var(--muted);
+    }
+    
+    @media (max-width: 768px) {
+      h1 { font-size: 36px; }
+      .subtext { font-size: 18px; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- HERO SECTION -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="logo-large">🧠</div>
+      <h1>Stop Guessing if Your Prompt Change Broke Production</h1>
+      <p class="subtext">
+        RegressAI compares LLM changes with deterministic diffs, safety judges, and versioned experiments.<br>
+        Ship with confidence. Never break prod again.
+      </p>
+      <div class="cta-buttons">
+        <a href="/login" class="btn btn-primary">Login with Google</a>
+        <a href="/app" class="btn btn-secondary">View Demo</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- VISUAL FLOW -->
+  <section class="visual-flow">
+    <h2>How It Works</h2>
+    <div class="flow-diagram">
+      <div class="flow-box">
+        <div class="flow-title">Old API</div>
+        <div class="flow-value">v1</div>
+      </div>
+      
+      <div class="flow-arrow">→</div>
+      
+      <div class="flow-box">
+        <div class="flow-title">New API</div>
+        <div class="flow-value">v2</div>
+      </div>
+      
+      <div class="flow-arrow">→</div>
+      
+      <div class="flow-box">
+        <div class="flow-title">Cookedness</div>
+        <div class="flow-value">42</div>
+      </div>
+      
+      <div class="flow-arrow">→</div>
+      
+      <div class="flow-box">
+        <div class="flow-title">Verdict</div>
+        <div class="flow-value">✅</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features">
+    <h2>Built for Developers, Not Marketers</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3 class="feature-title">Deterministic Diffs</h3>
+        <p class="feature-desc">
+          Automatically detect length changes, tone shifts, keyword removals, and structural differences between API versions.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">⚖️</div>
+        <h3 class="feature-title">LLM Safety Judge</h3>
+        <p class="feature-desc">
+          AI-powered analysis flags safety regressions, legal compliance issues, and hallucination risks before they hit production.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">🔥</div>
+        <h3 class="feature-title">Cookedness Scoring</h3>
+        <p class="feature-desc">
+          Get a single 0-100 score that tells you exactly how risky your changes are. Ship with data, not gut feeling.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">🕰️</div>
+        <h3 class="feature-title">Version Control</h3>
+        <p class="feature-desc">
+          Every analysis run is saved as an immutable version. Track changes over time, compare experiments, and rollback when needed.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">💡</div>
+        <h3 class="feature-title">Prompt Insights</h3>
+        <p class="feature-desc">
+          AI-powered suggestions identify root causes and provide actionable fixes for your prompts and system architecture.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3 class="feature-title">Fast & Local</h3>
+        <p class="feature-desc">
+          Run entirely on your infrastructure. No data leaves your network. MongoDB for persistence, FastAPI for speed.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>RegressAI &copy; 2025 • Built for developers who care about quality</p>
+  </footer>
+
+  <script>
+    // Scroll-based animations
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -100px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.animation = 'slideUp 0.8s ease-out forwards';
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.feature-card').forEach(card => {
+      card.style.opacity = '0';
+      observer.observe(card);
+    });
+  </script>
+</body>
+</html>
