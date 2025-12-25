@@ -12,6 +12,19 @@ from app.schemas import (
 )
 
 # ==========================================================
+# INTERNAL UTILITIES
+# ==========================================================
+
+def clean_doc(doc: Optional[Dict]) -> Optional[Dict]:
+    """
+    Removes the MongoDB internal _id (ObjectId) which is not 
+    JSON serializable by FastAPI's default encoder.
+    """
+    if doc and "_id" in doc:
+        del doc["_id"]
+    return doc
+
+# ==========================================================
 # USER OPERATIONS
 # ==========================================================
 
@@ -33,7 +46,7 @@ def get_or_create_user(
             {"user_id": user_id},
             {"$set": {"last_login": now}}
         )
-        return User(**existing)
+        return User(**clean_doc(existing))
 
     user = User(
         user_id=user_id,
@@ -55,7 +68,7 @@ def update_user_api_key(user_id: str, api_key: str) -> Optional[User]:
     result = db.users.update_one(
         {"user_id": user_id},
         {"$set": {
-            "gemini_api_key": api_key,
+            "api_key": api_key,
             "updated_at": datetime.utcnow()
         }}
     )
@@ -70,7 +83,7 @@ def get_user(user_id: str) -> Optional[User]:
     """
     db = get_db()
     doc = db.users.find_one({"user_id": user_id})
-    return User(**doc) if doc else None
+    return User(**clean_doc(doc)) if doc else None
 
 
 def get_user_stats(user_id: str) -> Dict[str, Any]:
@@ -114,17 +127,70 @@ def get_case(case_id: str, user_id: str) -> Optional[Case]:
     """
     db = get_db()
     doc = db.cases.find_one({"case_id": case_id, "user_id": user_id})
-    return Case(**doc) if doc else None
+    return Case(**clean_doc(doc)) if doc else None
+
+def get_case_for_user(case_id: str, user_id: str) -> Optional[Case]:
+    db = get_db()
+
+    # 1️⃣ Owner access
+    doc = db.cases.find_one({"case_id": case_id, "user_id": user_id})
+    if doc:
+        return Case(**clean_doc(doc))
+
+    # 2️⃣ Team member access
+    is_member = db.team_members.find_one({
+        "case_id": case_id,
+        "user_id": user_id
+    })
+
+    if is_member:
+        doc = db.cases.find_one({"case_id": case_id})
+        if doc:
+            return Case(**clean_doc(doc))
+
+    return None
 
 
 def list_cases(user_id: str) -> List[Case]:
     """
-    List all cases for a user.
+    List all cases a user owns OR is a collaborator on.
     """
     db = get_db()
-    docs = db.cases.find({"user_id": user_id}).sort("updated_at", -1)
-    return [Case(**doc) for doc in docs]
 
+    # 1️⃣ Own cases
+    owned = list(
+        db.cases.find({"user_id": user_id})
+    )
+
+    # 2️⃣ Case IDs where user is a collaborator
+    team_case_ids = db.team_members.distinct(
+        "case_id",
+        {"user_id": user_id}
+    )
+
+    collaborated = []
+    if team_case_ids:
+        collaborated = list(
+            db.cases.find({"case_id": {"$in": team_case_ids}})
+        )
+
+    # 3️⃣ Merge + dedupe
+    seen = set()
+    all_cases = []
+
+    for doc in owned + collaborated:
+        cid = doc.get("case_id")
+        if cid not in seen:
+            seen.add(cid)
+            all_cases.append(doc)
+
+    # 4️⃣ Sort by updated_at DESC
+    all_cases.sort(
+        key=lambda d: d.get("updated_at"),
+        reverse=True
+    )
+
+    return [Case(**clean_doc(doc)) for doc in all_cases]
 
 def update_case(
     case_id: str,
@@ -149,7 +215,7 @@ def update_case(
         return_document=True
     )
 
-    return Case(**doc) if doc else None
+    return Case(**clean_doc(doc)) if doc else None
 
 
 def delete_case(case_id: str, user_id: str) -> bool:
@@ -165,6 +231,8 @@ def delete_case(case_id: str, user_id: str) -> bool:
 # VERSION OPERATIONS
 # ==========================================================
 
+# In db_service.py - Update create_version function
+
 def create_version(
     case_id: str,
     user_id: str,
@@ -173,6 +241,7 @@ def create_version(
 ) -> Version:
     """
     Create an immutable version snapshot.
+    Extracts key fields from canonical response format.
     """
     db = get_db()
 
@@ -182,30 +251,39 @@ def create_version(
 
     next_version = case.version_count + 1
 
-    cookedness_score = analysis_response.get("cookedness", {}).get("cookedness_score", 0)
-    verdict = analysis_response.get("analysis", {}).get("verdict", "Unknown")
-    deterministic_score = analysis_response.get("deterministic", {}).get("deterministic_score", 0)
+    # Extract from canonical format
+    evaluation = analysis_response.get("evaluation", {})
+    scores = analysis_response.get("scores", {})
+    verdict_obj = analysis_response.get("verdict", {})
+    
+    cookedness_score = scores.get("cookedness", {}).get("score", 0)
+    verdict = verdict_obj.get("final", "Unknown")
+    deterministic_score = scores.get("deterministic_score", 0)
     test_case_count = len(analysis_response.get("test_cases", []))
-
-    # Extended analytics (safe optional fields)
-    behavioral_shift = analysis_response.get("behavioral_shift", {})
-    tradeoff = analysis_response.get("tradeoff", {})
-    error_novelty = analysis_response.get("error_novelty", {})
-
+    
+    # Extract root causes
+    root_causes = []
+    if evaluation.get("safety_override", {}).get("triggered"):
+        primary = evaluation["safety_override"].get("primary_root_cause")
+        if primary:
+            root_causes.append(primary)
+    
+    # Add other flags as secondary root causes
+    det_flags = evaluation.get("deterministic", {}).get("flags", [])
+    root_causes.extend(det_flags[:3])  # Top 3 flags
+    
     version = Version(
         version_id=f"ver_{uuid.uuid4().hex[:12]}",
         case_id=case_id,
         user_id=user_id,
         version_number=next_version,
         request_payload=request_payload,
-        analysis_response=analysis_response,
+        analysis_response=analysis_response,  # Store full canonical format
         cookedness_score=cookedness_score,
         verdict=verdict,
         deterministic_score=deterministic_score,
         test_case_count=test_case_count,
-        behavioral_shift=behavioral_shift,
-        tradeoff=tradeoff,
-        error_novelty=error_novelty,
+        root_causes=root_causes
     )
 
     db.versions.insert_one(version.model_dump())
@@ -228,21 +306,70 @@ def get_version(version_id: str, user_id: str) -> Optional[Version]:
     """
     db = get_db()
     doc = db.versions.find_one({"version_id": version_id, "user_id": user_id})
-    return Version(**doc) if doc else None
+    return Version(**clean_doc(doc)) if doc else None
+
+def get_version_for_user(version_id: str, user_id: str) -> Optional[Version]:
+    db = get_db()
+
+    # 1️⃣ Owner access
+    doc = db.versions.find_one({
+        "version_id": version_id,
+        "user_id": user_id
+    })
+    if doc:
+        return Version(**clean_doc(doc))
+
+    # 2️⃣ Team member access
+    version_doc = db.versions.find_one({"version_id": version_id})
+    if not version_doc:
+        return None
+
+    case_id = version_doc["case_id"]
+
+    is_member = db.team_members.find_one({
+        "case_id": case_id,
+        "user_id": user_id
+    })
+
+    if is_member:
+        return Version(**clean_doc(version_doc))
+
+    return None
 
 
 def list_versions(case_id: str, user_id: str) -> List[VersionMetadata]:
     """
-    List all versions for a case with metadata only.
+    List all versions for a case.
+    Owners see their versions.
+    Collaborators see owner's versions.
     """
     db = get_db()
 
+    # 1️⃣ Check if user is owner
+    case = db.cases.find_one({"case_id": case_id, "user_id": user_id})
+
+    if case:
+        # Owner → fetch normally
+        query = {"case_id": case_id}
+    else:
+        # 2️⃣ Check team membership
+        is_member = db.team_members.find_one({
+            "case_id": case_id,
+            "user_id": user_id
+        })
+
+        if not is_member:
+            return []  # 🚫 no access
+
+        # 3️⃣ Collaborator → fetch ALL versions of case
+        query = {"case_id": case_id}
+
     docs = db.versions.find(
-        {"case_id": case_id, "user_id": user_id},
+        query,
         {
             "_id": 0,
             "version_id": 1,
-            "case_id": 1,  # ✅ Include in projection
+            "case_id": 1,
             "version_number": 1,
             "cookedness_score": 1,
             "verdict": 1,
@@ -276,7 +403,7 @@ def get_case_with_versions(case_id: str, user_id: str) -> Optional[CaseWithVersi
     )
 
 # ==========================================================
-# ANALYTICS HELPERS (NEW)
+# ANALYTICS HELPERS
 # ==========================================================
 
 def get_latest_version(case_id: str, user_id: str) -> Optional[Version]:
@@ -288,7 +415,7 @@ def get_latest_version(case_id: str, user_id: str) -> Optional[Version]:
         {"case_id": case_id, "user_id": user_id},
         sort=[("version_number", -1)]
     )
-    return Version(**doc) if doc else None
+    return Version(**clean_doc(doc)) if doc else None
 
 
 def get_cookedness_trend(case_id: str, user_id: str) -> List[int]:
@@ -350,3 +477,244 @@ def get_helpfulness_safety_tradeoff(case_id: str, user_id: str) -> List[Dict[str
         }
         for d in docs
     ]
+
+
+# ==========================================================
+# COLLABORATION: TEAM MEMBERS
+# ==========================================================
+
+def add_team_member(case_id, user_id, email, display_name, role, added_by):
+    db = get_db()
+    member = {
+        "member_id": f"mem_{uuid.uuid4().hex[:10]}",
+        "case_id": case_id,
+        "user_id": user_id,
+        "email": email,
+        "display_name": display_name,
+        "role": role,
+        "added_by": added_by,
+        "added_at": datetime.utcnow()
+    }
+    db.team_members.insert_one(member)
+    return clean_doc(member)
+
+
+def get_case_members(case_id):
+    db = get_db()
+    
+    # Get the case to find the owner
+    case = db.cases.find_one({"case_id": case_id})
+    if not case:
+        return []
+    
+    owner_id = case["user_id"]
+    
+    # Get owner details
+    owner = db.users.find_one({"user_id": owner_id})
+    
+    # Build owner member object
+    members = []
+    if owner:
+        members.append({
+            "member_id": f"owner_{owner_id}",
+            "case_id": case_id,
+            "user_id": owner_id,
+            "email": owner.get("email", ""),
+            "display_name": owner.get("display_name"),
+            "role": "OWNER",
+            "added_by": owner_id,
+            "added_at": case["created_at"],
+            "is_owner": True  # Flag to identify owner
+        })
+    
+    # Get collaborators from team_members
+    collaborators = db.team_members.find({"case_id": case_id})
+    for member in collaborators:
+        member_data = clean_doc(member)
+        member_data["is_owner"] = False
+        members.append(member_data)
+    
+    return members
+
+
+def remove_team_member(case_id, member_id):
+    db = get_db()
+    res = db.team_members.delete_one({
+        "case_id": case_id,
+        "member_id": member_id
+    })
+    return res.deleted_count > 0
+
+
+def update_member_role(case_id, member_id, new_role):
+    db = get_db()
+    doc = db.team_members.find_one_and_update(
+        {"case_id": case_id, "member_id": member_id},
+        {"$set": {"role": new_role}},
+        return_document=True
+    )
+    return clean_doc(doc)
+
+
+def is_user_member(case_id, user_id):
+    db = get_db()
+    return db.team_members.find_one({
+        "case_id": case_id,
+        "user_id": user_id
+    }) is not None
+
+
+def get_user_role(case_id, user_id):
+    db = get_db()
+    m = db.team_members.find_one({
+        "case_id": case_id,
+        "user_id": user_id
+    })
+    return m["role"] if m else None
+
+
+# ==========================================================
+# COLLABORATION: INVITATIONS
+# ==========================================================
+
+def create_invitation(**data):
+    db = get_db()
+    invitation = {
+        "invitation_id": f"inv_{uuid.uuid4().hex[:10]}",
+        "status": "PENDING",
+        "created_at": datetime.utcnow(),
+        **data
+    }
+    db.invitations.insert_one(invitation)
+    return clean_doc(invitation)
+
+
+def get_invitation(invitation_id):
+    db = get_db()
+    return clean_doc(db.invitations.find_one({"invitation_id": invitation_id}))
+
+
+def get_user_invitations(email, status):
+    db = get_db()
+    return [clean_doc(i) for i in db.invitations.find({
+        "invited_email": email,
+        "status": status
+    })]
+
+
+def update_invitation_status(invitation_id, status):
+    db = get_db()
+    db.invitations.update_one(
+        {"invitation_id": invitation_id},
+        {"$set": {"status": status}}
+    )
+
+
+def cancel_invitation(invitation_id):
+    db = get_db()
+    res = db.invitations.delete_one({"invitation_id": invitation_id})
+    return res.deleted_count > 0
+
+
+# ==========================================================
+# COLLABORATION: COMMENTS
+# ==========================================================
+
+def create_comment(version_id, case_id, user_id, user_email, user_name, text):
+    db = get_db()
+    comment = {
+        "comment_id": f"cmt_{uuid.uuid4().hex[:10]}",
+        "version_id": version_id,
+        "case_id": case_id,
+        "user_id": user_id,
+        "user_email": user_email,
+        "user_name": user_name,
+        "text": text,
+        "created_at": datetime.utcnow()
+    }
+    db.comments.insert_one(comment)
+    return clean_doc(comment)
+
+
+def get_version_comments(version_id):
+    db = get_db()
+    return [clean_doc(c) for c in db.comments.find({"version_id": version_id})]
+
+
+def get_case_comments(case_id):
+    db = get_db()
+    return [clean_doc(c) for c in db.comments.find({"case_id": case_id})]
+
+
+def update_comment(comment_id, text):
+    db = get_db()
+    doc = db.comments.find_one_and_update(
+        {"comment_id": comment_id},
+        {"$set": {"text": text}},
+        return_document=True
+    )
+    return clean_doc(doc)
+
+
+def delete_comment(comment_id, user_id):
+    db = get_db()
+    res = db.comments.delete_one({
+        "comment_id": comment_id,
+        "user_id": user_id
+    })
+    return res.deleted_count > 0
+
+
+# ==========================================================
+# COLLABORATION: NOTIFICATIONS
+# ==========================================================
+
+def create_notification(user_id, type, title, message, link=None, metadata=None):
+    db = get_db()
+    notif = {
+        "notification_id": f"ntf_{uuid.uuid4().hex[:10]}",
+        "user_id": user_id,
+        "type": type,
+        "title": title,
+        "message": message,
+        "link": link,
+        "metadata": metadata or {},
+        "read": False,
+        "created_at": datetime.utcnow()
+    }
+    db.notifications.insert_one(notif)
+    return clean_doc(notif)
+
+
+def get_user_notifications(user_id, unread_only=False):
+    db = get_db()
+    q = {"user_id": user_id}
+    if unread_only:
+        q["read"] = False
+    return [clean_doc(n) for n in db.notifications.find(q).sort("created_at", -1)]
+
+
+def mark_notification_read(notification_id, user_id):
+    db = get_db()
+    res = db.notifications.update_one(
+        {"notification_id": notification_id, "user_id": user_id},
+        {"$set": {"read": True}}
+    )
+    return res.modified_count > 0
+
+
+def mark_all_notifications_read(user_id):
+    db = get_db()
+    res = db.notifications.update_many(
+        {"user_id": user_id, "read": False},
+        {"$set": {"read": True}}
+    )
+    return res.modified_count
+
+
+def get_unread_count(user_id):
+    db = get_db()
+    return db.notifications.count_documents({
+        "user_id": user_id,
+        "read": False
+    })

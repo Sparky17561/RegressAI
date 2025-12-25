@@ -10,7 +10,7 @@ class User(BaseModel):
     user_id: str
     email: str
     display_name: Optional[str] = None
-    gemini_api_key: Optional[str] = None
+    api_key: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -190,3 +190,175 @@ class Report(BaseModel):
     added: List[str]
     risks: List[str]
     keywords: List[str]
+
+
+# Add these new models to your existing schemas.py
+
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List
+from datetime import datetime
+from enum import Enum
+
+# ============================================
+# COLLABORATION ENUMS
+# ============================================
+
+class InvitationStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+class TeamRole(str, Enum):
+    OWNER = "owner"
+    EDITOR = "editor"
+    VIEWER = "viewer"
+
+class NotificationType(str, Enum):
+    INVITATION = "invitation"
+    COMMENT = "comment"
+    VERSION_CREATED = "version_created"
+    CASE_SHARED = "case_shared"
+
+# ============================================
+# TEAM MEMBER MODELS
+# ============================================
+
+class TeamMember(BaseModel):
+    member_id: str
+    case_id: str
+    user_id: str
+    email: str
+    display_name: Optional[str] = None
+    role: TeamRole
+    added_by: str
+    added_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class TeamMemberResponse(BaseModel):
+    member_id: str
+    user_id: str
+    email: str
+    display_name: Optional[str] = None
+    role: TeamRole
+    added_at: datetime
+    is_active: bool = True
+
+# ============================================
+# INVITATION MODELS
+# ============================================
+
+class Invitation(BaseModel):
+    invitation_id: str
+    case_id: str
+    case_name: str
+    invited_by: str
+    invited_by_email: str
+    invited_by_name: Optional[str] = None
+    invited_email: EmailStr
+    role: TeamRole
+    status: InvitationStatus
+    created_at: datetime
+    responded_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class InvitationCreate(BaseModel):
+    case_id: str
+    invited_email: EmailStr
+    role: TeamRole = TeamRole.VIEWER
+    invited_by: str  # user_id
+
+class InvitationResponse(BaseModel):
+    invitation_id: str
+    action: str  # "accept" or "reject"
+    user_id: str
+
+# ============================================
+# COMMENT MODELS
+# ============================================
+
+class Comment(BaseModel):
+    comment_id: str
+    version_id: str
+    case_id: str
+    user_id: str
+    user_email: str
+    user_name: Optional[str] = None
+    text: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class CommentCreate(BaseModel):
+    version_id: str
+    case_id: str
+    user_id: str
+    text: str
+
+class CommentUpdate(BaseModel):
+    comment_id: str
+    user_id: str
+    text: str
+
+# ============================================
+# NOTIFICATION MODELS
+# ============================================
+
+class Notification(BaseModel):
+    notification_id: str
+    user_id: str
+    type: NotificationType
+    title: str
+    message: str
+    link: Optional[str] = None
+    read: bool = False
+    created_at: datetime
+    metadata: Optional[dict] = None
+    
+    class Config:
+        from_attributes = True
+
+class NotificationResponse(BaseModel):
+    notification_id: str
+    type: NotificationType
+    title: str
+    message: str
+    link: Optional[str] = None
+    read: bool
+    created_at: datetime
+    metadata: Optional[dict] = None
+
+# ============================================
+# REQUEST MODELS
+# ============================================
+
+class AddTeamMemberRequest(BaseModel):
+    user_id: str
+    case_id: str
+    invited_email: EmailStr
+    role: TeamRole = TeamRole.VIEWER
+
+class RemoveTeamMemberRequest(BaseModel):
+    user_id: str
+    case_id: str
+    member_id: str
+
+class UpdateMemberRoleRequest(BaseModel):
+    user_id: str
+    case_id: str
+    member_id: str
+    new_role: TeamRole
+
+class GetNotificationsRequest(BaseModel):
+    user_id: str
+    unread_only: bool = False
+
+class MarkNotificationReadRequest(BaseModel):
+    user_id: str
+    notification_id: str
