@@ -1,4 +1,5 @@
 // static/js/premium.js - Fixed Premium Features Module
+// No duplicate exports. runDeepDive is exported only once (at definition).
 
 import { appState } from "./state.js";
 import { $, showTab } from "./utils.js";
@@ -18,35 +19,35 @@ export async function checkSubscription() {
     console.log("[PREMIUM] No user logged in");
     return;
   }
-  
+
   try {
     console.log("[PREMIUM] Checking subscription for user:", window.currentUser.uid);
-    
+
     const res = await fetch("/api/subscription/check", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: window.currentUser.uid })
     });
-    
+
     if (res.ok) {
       const data = await res.json();
-      
-      // 🔥 FIX: Normalize tier value
+
+      // Normalize tier value
       userSubscription = {
         tier: String(data.tier).toLowerCase(),
         is_premium: Boolean(data.is_premium || data.tier === "pro"),
         deep_dives_remaining: parseInt(data.deep_dives_remaining) || 0
       };
-      
+
       console.log("[PREMIUM] ✅ Subscription loaded:", userSubscription);
-      
-      // 🔥 FIX: Store in localStorage for persistence
+
+      // Persist locally as fallback
       localStorage.setItem('premium_status', JSON.stringify(userSubscription));
-      
+
       updatePremiumUI();
     } else {
       console.error("[PREMIUM] ❌ API call failed:", res.status);
-      
+
       // Try loading from localStorage as fallback
       const cached = localStorage.getItem('premium_status');
       if (cached) {
@@ -57,7 +58,7 @@ export async function checkSubscription() {
     }
   } catch (err) {
     console.error("[PREMIUM] ❌ Error:", err);
-    
+
     // Load from localStorage on error
     const cached = localStorage.getItem('premium_status');
     if (cached) {
@@ -70,11 +71,11 @@ export async function checkSubscription() {
 
 function updatePremiumUI() {
   const isPremium = userSubscription.is_premium;
-  
+
   console.log("[PREMIUM UI] Updating UI");
   console.log("[PREMIUM UI] Is Premium:", isPremium);
   console.log("[PREMIUM UI] Deep Dives:", userSubscription.deep_dives_remaining);
-  
+
   const elements = {
     deepDiveBtn: $("btnDeepDive"),
     premiumBadge: $("premiumBadge"),
@@ -83,40 +84,40 @@ function updatePremiumUI() {
     apiKeyHint: $("apiKeyHint"),
     remainingEl: $("deepDivesRemaining")
   };
-  
+
   // Deep Dive Button
   if (elements.deepDiveBtn) {
     elements.deepDiveBtn.style.display = isPremium ? "inline-block" : "none";
     console.log("[PREMIUM UI] Deep Dive button:", elements.deepDiveBtn.style.display);
   }
-  
+
   // Premium Badge
   if (elements.premiumBadge) {
     elements.premiumBadge.style.display = isPremium ? "flex" : "none";
-    
+
     if (elements.remainingEl && isPremium) {
       elements.remainingEl.textContent = `${userSubscription.deep_dives_remaining} deep dives left`;
     }
   }
-  
+
   // Upsell (show for free users)
   if (elements.premiumUpsell) {
     elements.premiumUpsell.style.display = isPremium ? "none" : "block";
   }
-  
+
   // Visualizations Tab
   if (elements.visualizationsTab) {
     elements.visualizationsTab.style.display = isPremium ? "inline-block" : "none";
   }
-  
+
   // API Key Hint
   if (elements.apiKeyHint) {
     elements.apiKeyHint.style.display = isPremium ? "block" : "none";
   }
-  
+
   // Force layout recalculation
   document.body.offsetHeight;
-  
+
   console.log("[PREMIUM UI] ✅ UI update complete");
 }
 
@@ -126,22 +127,22 @@ export async function runDeepDive() {
     alert("Please sign in first");
     return;
   }
-  
+
   console.log("[DEEP DIVE] Starting");
   console.log("[DEEP DIVE] Premium:", userSubscription.is_premium);
   console.log("[DEEP DIVE] Remaining:", userSubscription.deep_dives_remaining);
-  
+
   if (!userSubscription.is_premium) {
     console.log("[DEEP DIVE] Not premium, showing modal");
     openPricingModal();
     return;
   }
-  
+
   if (userSubscription.deep_dives_remaining <= 0) {
     alert("You've used all your deep dives for this month. Deep dives reset monthly.");
     return;
   }
-  
+
   const payload = {
     user_id: window.currentUser.uid,
     case_id: appState.activeCaseId || null,
@@ -158,13 +159,13 @@ export async function runDeepDive() {
     n_cases: parseInt($("numCases")?.value) || 10,
     manual_questions: []
   };
-  
+
   // Show loading
   const summaryTab = document.querySelector('[data-tab="summary"]');
   if (summaryTab) {
     showTab({ currentTarget: summaryTab });
   }
-  
+
   const summaryCard = $("summaryCard");
   if (summaryCard) {
     summaryCard.innerHTML = `<div class="loading">
@@ -173,54 +174,54 @@ export async function runDeepDive() {
       <p class="small">Generating test cases and computing advanced metrics</p>
     </div>`;
   }
-  
+
   updateStatusText("Deep Dive Running");
-  
+
   const btn = $("btnDeepDive");
   if (btn) {
     btn.disabled = true;
     btn.classList.add('loading');
   }
-  
+
   try {
     const res = await fetch("/api/deep-dive", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    
+
     if (!res.ok) {
-      const error = await res.json();
+      const error = await res.json().catch(() => ({}));
       throw new Error(error.detail || "Deep dive failed");
     }
-    
+
     const data = await res.json();
     console.log("[DEEP DIVE] ✅ Success:", data);
-    
+
     // Update state
     appState.activeCaseId = data.case_id;
     appState.activeVersionId = data.version_id;
     appState.lastRunInputs = captureCurrentInputs();
     appState.hasUnsavedChanges = false;
-    
-    // 🔥 FIX: Update deep dives count and save to localStorage
+
+    // Update deep dives count and persist
     userSubscription.deep_dives_remaining = data.deep_dives_remaining || 0;
     localStorage.setItem('premium_status', JSON.stringify(userSubscription));
     updatePremiumUI();
-    
+
     // Render results
     renderDeepDiveResults(data);
     updateStatusText(`Deep Dive Complete • v${data.version_number}`);
-    
+
     // Reload cases
     await loadCases();
-    
-    // Auto-switch to visualizations tab
+
+    // Auto-switch to visualizations tab if available
     const vizTab = document.querySelector('[data-tab="visualizations"]');
     if (vizTab) {
       showTab({ currentTarget: vizTab });
     }
-    
+
   } catch (err) {
     console.error("[DEEP DIVE] ❌ Error:", err);
     if (summaryCard) {
@@ -241,12 +242,12 @@ export async function runDeepDive() {
 // Render deep dive results with visualizations
 function renderDeepDiveResults(data) {
   console.log("[DEEP DIVE] Rendering results");
-  
+
   // Import renderResults dynamically
   import("./results.js").then(({ renderResults }) => {
     renderResults(data);
-    
-    // 🔥 FIX: Add null checks and default values
+
+    // Add null checks and default values
     if (data.is_deep_dive && data.visualization_data && data.deep_dive_metrics) {
       renderVisualizations(data.visualization_data, data.deep_dive_metrics);
     } else {
@@ -256,12 +257,14 @@ function renderDeepDiveResults(data) {
         has_metrics: !!data.deep_dive_metrics
       });
     }
+  }).catch(err => {
+    console.error("[DEEP DIVE] Failed to import results.js:", err);
   });
 }
 
 function renderVisualizations(vizData, deepMetrics) {
   console.log("[VISUALIZATIONS] Rendering charts");
-  
+
   // Clear any existing charts
   ['radarChart', 'qualityChart', 'performanceChart', 'hallucinationChart'].forEach(id => {
     const canvas = document.getElementById(id);
@@ -272,7 +275,7 @@ function renderVisualizations(vizData, deepMetrics) {
       }
     }
   });
-  
+
   // 1. Radar Chart - Metrics Comparison
   const radarCtx = document.getElementById('radarChart');
   if (radarCtx && vizData?.metrics_comparison) {
@@ -306,7 +309,7 @@ function renderVisualizations(vizData, deepMetrics) {
       }
     });
   }
-  
+
   // 2. Bar Chart - Quality Distribution
   const qualityCtx = document.getElementById('qualityChart');
   if (qualityCtx && vizData?.quality_distribution) {
@@ -340,7 +343,7 @@ function renderVisualizations(vizData, deepMetrics) {
       }
     });
   }
-  
+
   // 3. Line Chart - Performance Over Test Cases
   const perfCtx = document.getElementById('performanceChart');
   if (perfCtx && vizData?.test_case_performance) {
@@ -366,7 +369,7 @@ function renderVisualizations(vizData, deepMetrics) {
       },
       options: {
         scales: {
-          y: { 
+          y: {
             min: 0,
             max: 100,
             title: { display: true, text: 'Quality Score' }
@@ -375,7 +378,7 @@ function renderVisualizations(vizData, deepMetrics) {
       }
     });
   }
-  
+
   // 4. Doughnut Chart - Hallucination Rate
   const hallCtx = document.getElementById('hallucinationChart');
   if (hallCtx && vizData?.hallucination_data) {
@@ -402,7 +405,7 @@ function renderVisualizations(vizData, deepMetrics) {
       }
     });
   }
-  
+
   // 5. Render deep metrics text
   const deepMetricsEl = $("deepMetrics");
   if (deepMetricsEl && deepMetrics) {
@@ -539,58 +542,70 @@ function closePricingModal() {
   }
 }
 
-// Upgrade to Pro
 async function upgradeToPro() {
   if (!window.currentUser) {
     alert("Please sign in first");
     return;
   }
-  
-  console.log("[UPGRADE] Starting");
-  
-  const confirmed = confirm("Upgrade to Pro for ₹399/month?\n\n(Demo - no payment)");
-  
-  if (!confirmed) return;
-  
-  try {
-    const res = await fetch("/api/subscription/upgrade", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: window.currentUser.uid })
-    });
-    
-    if (res.ok) {
-      const data = await res.json();
-      console.log("[UPGRADE] ✅ Success:", data);
-      
-      // 🔥 FIX: Update local state and localStorage
-      userSubscription = {
-        tier: "pro",
-        is_premium: true,
-        deep_dives_remaining: data.deep_dives_remaining || 5
-      };
-      localStorage.setItem('premium_status', JSON.stringify(userSubscription));
-      
-      alert("🎉 Successfully upgraded to Pro!\n\nYou now have:\n• Deep Dive Analysis\n• Advanced Visualizations\n• 5 deep dives/month\n• RegressAI API (no key needed)");
-      
-      updatePremiumUI();
-      closePricingModal();
-    } else {
-      throw new Error("Upgrade failed");
-    }
-  } catch (err) {
-    console.error("[UPGRADE] ❌ Error:", err);
-    alert("Upgrade failed. Please try again.");
+
+  const res = await fetch("/api/payments/create-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: window.currentUser.uid })
+  });
+
+  if (!res.ok) {
+    console.error("[UPGRADE] Failed to create order", res.status);
+    alert("Failed to initiate payment. Try again later.");
+    return;
   }
+
+  const order = await res.json();
+
+  const options = {
+    key: order.key_id,
+    amount: order.amount,
+    currency: order.currency,
+    name: "RegressAI",
+    description: "Pro Plan – ₹399",
+    order_id: order.order_id,
+    handler: async function (response) {
+
+      const verifyRes = await fetch("/api/payments/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: window.currentUser.uid,
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature
+        })
+      });
+
+      const data = await verifyRes.json();
+
+      if (data.success) {
+        alert("🎉 Payment successful! Pro unlocked.");
+        await checkSubscription(); // re-fetch from backend
+        closePricingModal();
+      } else {
+        alert("Payment verification failed. Contact support.");
+      }
+    },
+    theme: { color: "#6366f1" }
+  };
+
+  const rzp = new Razorpay(options);
+  rzp.open();
 }
 
-// 🔥 NEW: Check premium on page load (before auth completes)
+
+// Check premium on page load (before auth completes)
 const cachedPremium = localStorage.getItem('premium_status');
 if (cachedPremium) {
   try {
     userSubscription = JSON.parse(cachedPremium);
     console.log("[PREMIUM] Loaded from cache on init:", userSubscription);
-    // Set UI immediately if we have cached data
     setTimeout(updatePremiumUI, 100);
   } catch (e) {
     console.error("[PREMIUM] Failed to parse cached data:", e);
@@ -600,12 +615,12 @@ if (cachedPremium) {
 // Event listeners
 document.addEventListener("DOMContentLoaded", () => {
   console.log("[PREMIUM] Setting up event listeners");
-  
+
   const btnDeepDive = $("btnDeepDive");
   if (btnDeepDive) {
     btnDeepDive.addEventListener("click", runDeepDive);
   }
-  
+
   const upgradeLink = $("upgradeToPremiumLink");
   if (upgradeLink) {
     upgradeLink.addEventListener("click", (e) => {
@@ -613,12 +628,12 @@ document.addEventListener("DOMContentLoaded", () => {
       openPricingModal();
     });
   }
-  
+
   const closePricingBtn = $("closePricingBtn");
   if (closePricingBtn) {
     closePricingBtn.addEventListener("click", closePricingModal);
   }
-  
+
   const upgradeBtn = $("upgradeToPro");
   if (upgradeBtn) {
     upgradeBtn.addEventListener("click", upgradeToPro);
@@ -633,11 +648,11 @@ window.addEventListener('auth-ready', async () => {
   }
 });
 
-// Make functions globally available
+// Make functions globally available for non-module callers
 window.checkSubscription = checkSubscription;
 window.runDeepDive = runDeepDive;
 window.openPricingModal = openPricingModal;
-window.renderDeepDiveVisualizations = renderVisualizations; // 🔥 EXPOSE THIS
+window.renderDeepDiveVisualizations = renderVisualizations;
 
-// Export for module imports
+// ES module exports
 export { renderVisualizations };

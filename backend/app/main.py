@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from app.api.routes import router as analyze_router
 from app.mock_llms import router as mock_router
+from app.api.razorpay_routes import router as razorpay_router
 from app.config import MongoDB
 
 # ============================================
@@ -45,7 +46,7 @@ templates = Jinja2Templates(directory="app/templates")
 # API routers (JSON only)
 app.include_router(analyze_router, prefix="/api")
 app.include_router(mock_router)
-
+app.include_router(razorpay_router)
 # ============================================
 # HTML ROUTES
 # ============================================
