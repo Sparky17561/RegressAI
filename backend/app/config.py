@@ -1,6 +1,14 @@
 import os
 from pymongo import MongoClient
 from typing import Optional
+from dotenv import load_dotenv
+
+# ============================================
+# LOAD ENVIRONMENT VARIABLES
+# ============================================
+
+# Load from .env if present
+load_dotenv()
 
 # ============================================
 # MONGODB CONNECTION
@@ -41,15 +49,34 @@ def get_db():
     return MongoDB.get_db()
 
 # ============================================
-# FIREBASE ADMIN (for backend auth verification)
+# REGRESSAI / GROQ CONFIGURATION
 # ============================================
 
-# If you want to verify Firebase tokens on backend:
+# 🔐 RegressAI-owned Groq API key (PREMIUM USERS ONLY)
+REGRESSAI_GROQ_KEY = os.getenv("REGRESSAI_GROQ_KEY")
+
+if not REGRESSAI_GROQ_KEY:
+    print("⚠️  REGRESSAI_GROQ_KEY not set. Premium features will be disabled.")
+
+
+
+OLD_GROQ_KEY_ENV = os.getenv("OLD_GROQ_KEY")
+NEW_GROQ_KEY_ENV = os.getenv("NEW_GROQ_KEY")
+
+if not OLD_GROQ_KEY_ENV or not NEW_GROQ_KEY_ENV:
+    raise RuntimeError("Groq API keys missing in .env")
+# ============================================
+# OPTIONAL: FIREBASE ADMIN (BACKEND AUTH)
+# ============================================
+
+# Uncomment if you want backend verification of Firebase tokens
+#
 # import firebase_admin
 # from firebase_admin import credentials, auth
-# 
+#
 # cred = credentials.Certificate("path/to/serviceAccountKey.json")
 # firebase_admin.initialize_app(cred)
 
-# For now, we'll trust the frontend sends user_id from Firebase Auth
-# In production, you'd verify the ID token on backend
+# NOTE:
+# For now, backend trusts `user_id` coming from frontend Firebase Auth.
+# In production, verify Firebase ID tokens here.

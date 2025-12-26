@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter
 from pydantic import BaseModel
 from groq import Groq
-
+from app.config import OLD_GROQ_KEY_ENV, NEW_GROQ_KEY_ENV
 # ============================================================
 # ROUTER
 # ============================================================
@@ -21,8 +21,8 @@ class PromptRequest(BaseModel):
 # GROQ CLIENTS (TWO KEYS)
 # ============================================================
 
-OLD_GROQ_KEY = "<OLD_GROQ_KEY>"
-NEW_GROQ_KEY = "<NEW_GROQ_KEY>"
+OLD_GROQ_KEY = OLD_GROQ_KEY_ENV
+NEW_GROQ_KEY = NEW_GROQ_KEY_ENV
 
 if not OLD_GROQ_KEY or not NEW_GROQ_KEY:
     raise RuntimeError("Both GROQ_OLD_API_KEY and GROQ_NEW_API_KEY must be set")

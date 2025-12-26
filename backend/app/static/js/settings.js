@@ -1,4 +1,4 @@
-// settings.js - Settings Modal Module
+// settings.js - Settings Modal Module (FIXED)
 import { checkApiKeyStatus, saveApiKey } from "./api.js";
 import { appState } from "./state.js";
 import { $ } from "./utils.js";
@@ -36,15 +36,70 @@ export async function openSettings() {
   
   modal.style.display = 'flex';
   
+  // 🔥 FIX: Check premium status from localStorage
+  const cachedPremium = localStorage.getItem('premium_status');
+  let isPremium = false;
+  
+  if (cachedPremium) {
+    try {
+      const premiumData = JSON.parse(cachedPremium);
+      isPremium = premiumData.is_premium || premiumData.tier === "pro";
+    } catch (e) {
+      console.error("Failed to parse premium data:", e);
+    }
+  }
+  
   // Load current API key status
   try {
     const data = await checkApiKeyStatus();
     const statusEl = $('apiKeyStatus');
-    if (statusEl) {
-      if (data.has_api_key) {
-        statusEl.innerHTML = `<span class="status-success">✓ API key configured (${data.api_key_preview})</span>`;
-      } else {
-        statusEl.innerHTML = '<span class="status-warning">⚠ No API key configured</span>';
+    const keyInput = $('geminiApiKey');
+    const apiKeyHint = $('apiKeyHint');
+    
+    if (isPremium) {
+      // 🔥 FIX: Show premium message
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="status-success">✓ Using RegressAI Premium API</span>`;
+      }
+      
+      // Disable input and show placeholder
+      if (keyInput) {
+        keyInput.disabled = true;
+        keyInput.value = "";
+        keyInput.placeholder = "🔒 Premium: No API key needed";
+      }
+      
+      // Show hint
+      if (apiKeyHint) {
+        apiKeyHint.style.display = "block";
+        apiKeyHint.innerHTML = '<span class="status-success">✨ Premium users don\'t need to provide their API key. We use RegressAI\'s API for all analysis.</span>';
+      }
+    } else {
+      // 🔥 FIX: Free user - show actual API key preview
+      if (statusEl) {
+        if (data.has_api_key) {
+          statusEl.innerHTML = `<span class="status-success">✓ API key configured</span>`;
+        } else {
+          statusEl.innerHTML = '<span class="status-warning">⚠ No API key configured</span>';
+        }
+      }
+      
+      // 🔥 FIX: Show API key preview in input if exists
+      if (keyInput) {
+        keyInput.disabled = false;
+        if (data.has_api_key && data.api_key_preview) {
+          // Show preview with asterisks
+          keyInput.placeholder = `Current: ${data.api_key_preview}`;
+          keyInput.value = ""; // Clear value, user can type new one
+        } else {
+          keyInput.placeholder = "Enter your Groq API key";
+          keyInput.value = "";
+        }
+      }
+      
+      // Hide premium hint
+      if (apiKeyHint) {
+        apiKeyHint.style.display = "none";
       }
     }
   } catch (e) {
@@ -57,10 +112,32 @@ export function closeSettings() {
   const keyInput = $('geminiApiKey');
   
   if (modal) modal.style.display = 'none';
-  if (keyInput) keyInput.value = '';
+  if (keyInput) {
+    keyInput.value = '';
+    keyInput.disabled = false; // Re-enable in case it was disabled
+  }
 }
 
 export async function saveSettings() {
+  // Check if premium
+  const cachedPremium = localStorage.getItem('premium_status');
+  let isPremium = false;
+  
+  if (cachedPremium) {
+    try {
+      const premiumData = JSON.parse(cachedPremium);
+      isPremium = premiumData.is_premium || premiumData.tier === "pro";
+    } catch (e) {
+      console.error("Failed to parse premium data:", e);
+    }
+  }
+  
+  if (isPremium) {
+    alert("Premium users don't need to configure an API key. RegressAI provides the API for you!");
+    closeSettings();
+    return;
+  }
+  
   const apiKey = $('geminiApiKey')?.value?.trim();
   
   if (!apiKey) {

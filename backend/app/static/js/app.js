@@ -1,32 +1,87 @@
-// app.js — Main Entry Point
+// static/js/app.js
+// ============================================================================
+// Application Entry Point (HARDENED + ORDERED)
+// ============================================================================
+//
+// RESPONSIBILITIES
+// ----------------
+// - Boot authentication
+// - Initialize settings
+// - Wire UI events
+// - Ensure correct lifecycle ordering
+//
+// IMPORTANT
+// ---------
+// - app.js does NOT render results
+// - app.js does NOT control premium UI
+// - app.js ensures modules load in correct order
+//
+// ============================================================================
 
 import { initAuth, logout } from "./auth.js";
-import { initSettingsHandlers, openSettings } from "./settings.js";
+import { initSettingsHandlers } from "./settings.js";
 import { setupInputChangeListeners } from "./inputs.js";
 import { showTab } from "./utils.js";
 import { runAnalysis } from "./analysis.js";
 import { createNewCase } from "./cases.js";
+import { checkSubscription } from "./premium.js";
 
-// Import all modules to ensure they're loaded
+// Force-load modules with side effects
 import "./cases.js";
 import "./versions.js";
 import "./ui.js";
 import "./collaboration.js";
 import "./results.js";
 import "./settings.js";
+import "./premium.js";
 
-// Boot auth (this triggers everything else)
+console.log("[APP] module loaded");
+
+// ============================================================================
+// AUTH BOOTSTRAP
+// ============================================================================
+
 initAuth();
 initSettingsHandlers();
 
+// Auth-ready is the TRUE app start
+window.addEventListener("auth-ready", async () => {
+  console.log("[APP] auth-ready event received");
+
+  if (!window.currentUser) {
+    console.warn("[APP] auth-ready but no currentUser");
+    return;
+  }
+
+  try {
+    await checkSubscription();
+    console.log("[APP] subscription check complete");
+  } catch (e) {
+    console.warn("[APP] subscription check failed:", e);
+  }
+});
+
+// ============================================================================
+// DOM READY
+// ============================================================================
+
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("[APP] DOMContentLoaded");
+
   setupInputChangeListeners();
   setupEventListeners();
   setupDefaultTab();
+
+  console.log("[APP] UI fully wired");
 });
 
+// ============================================================================
+// EVENT WIRING
+// ============================================================================
+
 function setupEventListeners() {
-  // Main action buttons
+  console.log("[APP] Wiring event listeners");
+
   const btnAnalyze = document.getElementById("btnAnalyze");
   if (btnAnalyze) {
     btnAnalyze.addEventListener("click", runAnalysis);
@@ -39,10 +94,9 @@ function setupEventListeners() {
 
   const btnSettings = document.getElementById("btnSettings");
   if (btnSettings) {
-    // ✅ REPLACE WITH THIS
-      btnSettings.addEventListener("click", () => {
-        window.openSettings();
-      });
+    btnSettings.addEventListener("click", () => {
+      window.openSettings?.();
+    });
   }
 
   const btnLogout = document.getElementById("btnLogout");
@@ -56,19 +110,30 @@ function setupEventListeners() {
   });
 }
 
+// ============================================================================
+// DEFAULT TAB SETUP
+// ============================================================================
+
 function setupDefaultTab() {
-  // Ensure first tab is active
+  console.log("[APP] Setting default tab");
+
   document.querySelectorAll(".tab-btn").forEach(btn =>
     btn.classList.remove("active")
   );
 
-  const firstTab = document.querySelector('[data-tab="summary"]');
-  if (firstTab) firstTab.classList.add("active");
+  const summaryBtn = document.querySelector('[data-tab="summary"]');
+  if (summaryBtn) {
+    summaryBtn.classList.add("active");
+  }
 
   document.querySelectorAll(".pane").forEach(p =>
     p.classList.remove("active")
   );
 
-  const firstPane = document.getElementById("tab-summary");
-  if (firstPane) firstPane.classList.add("active");
+  const summaryPane = document.getElementById("tab-summary");
+  if (summaryPane) {
+    summaryPane.classList.add("active");
+  }
 }
+
+console.log("[APP] app.js fully initialized");

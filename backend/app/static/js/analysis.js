@@ -1,4 +1,4 @@
-// analysis.js - Analysis Execution Module
+// analysis.js - Analysis Execution Module (Updated for Premium)
 import { runAnalysisAPI } from "./api.js";
 import { appState } from "./state.js";
 import { captureCurrentInputs } from "./inputs.js";
@@ -8,14 +8,37 @@ import { updateStatusText, updateAnalyzeButton } from "./ui.js";
 import { openSettings } from "./settings.js";
 import { $, showTab } from "./utils.js";
 
+// Check if user is premium
+async function checkPremiumStatus() {
+  try {
+    const res = await fetch("/api/subscription/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: window.currentUser.uid })
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      return data.is_premium;
+    }
+  } catch (err) {
+    console.error("Premium check failed:", err);
+  }
+  return false;
+}
+
 export async function runAnalysis() {
   if (!window.currentUser) {
     alert("Please sign in first");
     return;
   }
   
-  if (!appState.hasApiKey) {
-    alert("Please configure your Gemini API key in Settings first");
+  // Check if user is premium
+  const isPremium = await checkPremiumStatus();
+  
+  // Premium users don't need API key
+  if (!isPremium && !appState.hasApiKey) {
+    alert("Please configure your Groq API key in Settings first");
     openSettings();
     return;
   }
@@ -37,7 +60,8 @@ export async function runAnalysis() {
     old_prompt: $("oldPrompt")?.value || "",
     new_prompt: $("newPrompt")?.value || "",
     n_cases: parseInt($("numCases")?.value) || 3,
-    manual_questions: manualQs ? manualQs.split("\n").map(s => s.trim()).filter(Boolean) : []
+    manual_questions: manualQs ? manualQs.split("\n").map(s => s.trim()).filter(Boolean) : [],
+    use_regressai_api: isPremium  // Flag for backend
   };
 
   // Validation
@@ -58,6 +82,7 @@ export async function runAnalysis() {
     summaryCard.innerHTML = `<div class="loading">
       <div class="spinner"></div>
       <p>Running analysis...</p>
+      ${isPremium ? '<p class="small">Using RegressAI API</p>' : ''}
     </div>`;
   }
   

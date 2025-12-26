@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RegressAI — Evaluation Console</title>
   <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- Add Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
 
 <body>
@@ -53,6 +55,12 @@
       </div>
 
       <div class="sidebar-footer">
+        <!-- Premium Badge -->
+        <div id="premiumBadge" class="premium-badge" style="display:none;">
+          <span class="badge badge-premium">✨ PRO</span>
+          <span id="deepDivesRemaining" class="small">5 deep dives left</span>
+        </div>
+        
         <button class="btn alt btn-settings" id="btnSettings">⚙️ Settings</button>
         <button class="btn alt btn-logout" id="btnLogout">Logout</button>
       </div>
@@ -133,7 +141,17 @@
 
           <div class="action-bar">
             <button class="btn primary btn-analyze" id="btnAnalyze">⚡ Analyze</button>
+            <button class="btn premium btn-deep-dive" id="btnDeepDive" style="display:none;">
+              🔬 Deep Dive
+            </button>
             <span class="btn-hint">Any change creates a new version</span>
+          </div>
+          
+          <!-- Premium Upsell (for free users) -->
+          <div id="premiumUpsell" class="premium-upsell">
+            <p>Still can't figure out what's wrong? 
+              <a href="#" id="upgradeToPremiumLink">Check out Premium</a>
+            </p>
           </div>
         </div>
       </section>
@@ -149,6 +167,9 @@
           <button class="tab-btn active" data-tab="summary">📊 Summary</button>
           <button class="tab-btn" data-tab="diff">🔍 Diff</button>
           <button class="tab-btn" data-tab="suggest">💡 Insights</button>
+          <button class="tab-btn premium-tab" data-tab="visualizations" style="display:none;">
+            📈 Visualizations <span class="badge badge-premium">PRO</span>
+          </button>
           <button class="tab-btn" data-tab="snapshot">📸 Snapshot</button>
         </div>
 
@@ -215,6 +236,36 @@
               <ul id="metrics" class="card-list"></ul>
             </div>
 
+            <!-- VISUALIZATIONS (PREMIUM) -->
+            <div id="tab-visualizations" class="tab pane">
+              <h2>🔬 Deep Dive Visualizations</h2>
+              
+              <div class="viz-grid">
+                <div class="viz-card">
+                  <h3>Metrics Comparison</h3>
+                  <canvas id="radarChart"></canvas>
+                </div>
+                
+                <div class="viz-card">
+                  <h3>Quality Distribution</h3>
+                  <canvas id="qualityChart"></canvas>
+                </div>
+                
+                <div class="viz-card">
+                  <h3>Performance Over Test Cases</h3>
+                  <canvas id="performanceChart"></canvas>
+                </div>
+                
+                <div class="viz-card">
+                  <h3>Hallucination Rate</h3>
+                  <canvas id="hallucinationChart"></canvas>
+                </div>
+              </div>
+              
+              <h3>Advanced Metrics</h3>
+              <div id="deepMetrics" class="deep-metrics"></div>
+            </div>
+
             <!-- SNAPSHOT -->
             <div id="tab-snapshot" class="tab pane">
               <h2>Raw JSON Snapshot</h2>
@@ -233,6 +284,56 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- PRICING MODAL -->
+  <div id="pricingModal" class="modal" style="display:none;">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h2>Choose Your Plan</h2>
+        <button class="btn-icon modal-close" id="closePricingBtn">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="pricing-grid">
+          <!-- Free Tier -->
+          <div class="pricing-card">
+            <h3>Freemium</h3>
+            <div class="price">₹0<span>/month</span></div>
+            <ul class="features">
+              <li>✅ Basic Analysis</li>
+              <li>✅ 3 test cases per run</li>
+              <li>✅ Deterministic diff</li>
+              <li>✅ Basic insights</li>
+              <li>✅ Team collaboration</li>
+              <li>❌ No deep dive</li>
+              <li>❌ No visualizations</li>
+              <li>🔑 Requires your API key</li>
+            </ul>
+            <button class="btn alt" disabled>Current Plan</button>
+          </div>
+
+          <!-- Pro Tier -->
+          <div class="pricing-card pricing-card-featured">
+            <div class="badge badge-premium">RECOMMENDED</div>
+            <h3>Pro</h3>
+            <div class="price">₹399<span>/month</span></div>
+            <ul class="features">
+              <li>✅ Everything in Free</li>
+              <li>✨ Deep Dive Analysis</li>
+              <li>✨ Adversarial testing</li>
+              <li>✨ 10+ test cases</li>
+              <li>✨ Advanced visualizations</li>
+              <li>✨ Hallucination detection</li>
+              <li>✨ Edge case analysis</li>
+              <li>✨ 5 deep dives/month</li>
+              <li>🎁 Uses RegressAI API (no key needed)</li>
+            </ul>
+            <button class="btn premium" id="upgradeToPro">Upgrade to Pro</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- INVITE MODAL -->
@@ -274,11 +375,14 @@
 
       <div class="modal-body">
         <div class="input-group">
-          <label>Gemini API Key</label>
-          <input type="password" id="geminiApiKey" placeholder="Enter your Gemini API key">
+          <label>Groq API Key</label>
+          <input type="password" id="geminiApiKey" placeholder="Enter your Groq API key">
           <div class="hint">
             Get your API key from 
-            <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>
+            <a href="https://console.groq.com/keys" target="_blank">Groq Console</a>
+          </div>
+          <div class="hint muted" id="apiKeyHint">
+            Note: Premium users don't need to provide their API key
           </div>
           <div id="apiKeyStatus" class="api-key-status"></div>
         </div>
@@ -298,6 +402,7 @@
   <script type="module" src="/static/js/api.js"></script>
   <script type="module" src="/static/js/app.js"></script>
   <script type="module" src="/static/js/collaboration.js"></script>
+  <script type="module" src="/static/js/premium.js"></script>
 
 </body>
 </html>

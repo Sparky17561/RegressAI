@@ -19,3 +19,4 @@ httpx==0.26.0
 
 groq
 google-generativeai
+python-dotenv

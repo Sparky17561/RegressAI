@@ -9,7 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "",
+  apiKey: "<API_KEY>",
   authDomain: "techsprint-32cd2.firebaseapp.com",
   projectId: "techsprint-32cd2",
   storageBucket: "techsprint-32cd2.firebasestorage.app",

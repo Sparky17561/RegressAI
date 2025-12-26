@@ -337,11 +337,14 @@ def get_version_for_user(version_id: str, user_id: str) -> Optional[Version]:
     return None
 
 
+# In db_service.py - Update list_versions function
+
 def list_versions(case_id: str, user_id: str) -> List[VersionMetadata]:
     """
     List all versions for a case.
     Owners see their versions.
     Collaborators see owner's versions.
+    🔥 NOW INCLUDES is_deep_dive FLAG
     """
     db = get_db()
 
@@ -373,12 +376,31 @@ def list_versions(case_id: str, user_id: str) -> List[VersionMetadata]:
             "version_number": 1,
             "cookedness_score": 1,
             "verdict": 1,
-            "created_at": 1
+            "created_at": 1,
+            "analysis_response.is_deep_dive": 1  # 🔥 ADD THIS
         }
     ).sort("version_number", -1)
 
-    return [VersionMetadata(**doc) for doc in docs]
-
+    # 🔥 FIX: Extract is_deep_dive from nested structure
+    result = []
+    for doc in docs:
+        # Check if is_deep_dive exists in analysis_response
+        is_deep_dive = False
+        if "analysis_response" in doc:
+            is_deep_dive = doc["analysis_response"].get("is_deep_dive", False)
+        
+        version_meta = {
+            "version_id": doc["version_id"],
+            "case_id": doc["case_id"],
+            "version_number": doc["version_number"],
+            "cookedness_score": doc["cookedness_score"],
+            "verdict": doc["verdict"],
+            "created_at": doc["created_at"],
+            "is_deep_dive": is_deep_dive  # 🔥 ADD THIS
+        }
+        result.append(VersionMetadata(**version_meta))
+    
+    return result
 
 
 def get_case_with_versions(case_id: str, user_id: str) -> Optional[CaseWithVersions]:
@@ -718,3 +740,25 @@ def get_unread_count(user_id):
         "user_id": user_id,
         "read": False
     })
+
+from datetime import datetime
+from app.schemas import SubscriptionTier
+
+def upgrade_user_to_pro(user_id: str):
+    db = get_db()
+    return db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "subscription_tier": "pro",  # ✅ Store as lowercase string
+            "deep_dives_remaining": 5,
+            "deep_dive_reset_date": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+def decrement_deep_dive(user_id: str):
+    db = get_db()
+    return db.users.update_one(
+        {"user_id": user_id, "deep_dives_remaining": {"$gt": 0}},
+        {"$inc": {"deep_dives_remaining": -1}}
+    )

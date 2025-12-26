@@ -5,17 +5,26 @@ from datetime import datetime
 # ============================================
 # USER SCHEMA
 # ============================================
+from enum import Enum
+
+class SubscriptionTier(str, Enum):
+    FREE = "free"
+    PRO = "pro"
 
 class User(BaseModel):
     user_id: str
     email: str
     display_name: Optional[str] = None
     api_key: Optional[str] = None
+    subscription_tier: SubscriptionTier = SubscriptionTier.FREE
+    deep_dives_remaining: int = 0
+    deep_dive_reset_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
+        use_enum_values = True  # ← Add this line to serialize enums as their values
 
 
 # ============================================
@@ -38,6 +47,8 @@ class Case(BaseModel):
 # VERSION SCHEMAS
 # ============================================
 
+# In schemas.py - Update VersionMetadata class
+
 class VersionMetadata(BaseModel):
     """Lightweight version info for list views"""
     version_id: str
@@ -46,7 +57,7 @@ class VersionMetadata(BaseModel):
     cookedness_score: int
     verdict: str
     created_at: datetime
-
+    is_deep_dive: bool = False  # 🔥 ADD THIS
 
 class AnalysisSummary(BaseModel):
     """
@@ -362,3 +373,88 @@ class GetNotificationsRequest(BaseModel):
 class MarkNotificationReadRequest(BaseModel):
     user_id: str
     notification_id: str
+
+    # Add to schemas.py
+
+from enum import Enum
+
+class SubscriptionTier(str, Enum):
+    FREE = "free"
+    PRO = "pro"
+
+class User(BaseModel):
+    user_id: str
+    email: str
+    display_name: Optional[str] = None
+    api_key: Optional[str] = None
+    subscription_tier: SubscriptionTier = SubscriptionTier.FREE
+    deep_dives_remaining: int = 0  # Resets monthly for pro users
+    deep_dive_reset_date: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class DeepDiveMetrics(BaseModel):
+    """Advanced metrics for premium deep dive analysis"""
+    adversarial_robustness: Dict[str, Any] = {}
+    instruction_adherence: Dict[str, Any] = {}
+    consistency_score: int = 0
+    hallucination_rate: float = 0.0
+    response_quality_distribution: Dict[str, int] = {}
+    safety_breakdown: Dict[str, Any] = {}
+    edge_case_handling: List[Dict[str, Any]] = []
+    performance_degradation: Dict[str, Any] = {}
+    token_efficiency: Dict[str, Any] = {}
+    response_time_analysis: Dict[str, Any] = {}
+
+class DeepDiveVersion(BaseModel):
+    """Premium version with deep analytics"""
+    version_id: str
+    case_id: str
+    user_id: str
+    version_number: int
+    is_deep_dive: bool = True
+    
+    # All standard version fields
+    request_payload: Dict[str, Any]
+    analysis_response: Dict[str, Any]
+    
+    # Premium metrics
+    deep_dive_metrics: DeepDiveMetrics
+    
+    # Visualization data
+    visualization_data: Dict[str, Any] = {}
+    
+    # Quick access
+    cookedness_score: int = 0
+    verdict: str = "Unknown"
+    deterministic_score: int = 0
+    test_case_count: int = 0
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class DeepDiveRequest(BaseModel):
+    """Request for premium deep dive analysis"""
+    user_id: str
+    case_id: Optional[str] = None
+    case_name: Optional[str] = None
+    
+    # Same inputs as regular analyze
+    mode: str
+    old_api: str
+    new_api: str
+    env: str
+    body_template: str
+    response_path: str
+    goal: str
+    old_prompt: str
+    new_prompt: str
+    n_cases: int = 10  # More test cases for deep dive
+    manual_questions: List[str] = []
+    
+    # Deep dive specific
+    include_adversarial: bool = True
+    include_edge_cases: bool = True
+    include_stress_tests: bool = True
