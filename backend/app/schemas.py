@@ -376,25 +376,7 @@ class MarkNotificationReadRequest(BaseModel):
 
     # Add to schemas.py
 
-from enum import Enum
 
-class SubscriptionTier(str, Enum):
-    FREE = "free"
-    PRO = "pro"
-
-class User(BaseModel):
-    user_id: str
-    email: str
-    display_name: Optional[str] = None
-    api_key: Optional[str] = None
-    subscription_tier: SubscriptionTier = SubscriptionTier.FREE
-    deep_dives_remaining: int = 0  # Resets monthly for pro users
-    deep_dive_reset_date: Optional[datetime] = None
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 class DeepDiveMetrics(BaseModel):
     """Advanced metrics for premium deep dive analysis"""

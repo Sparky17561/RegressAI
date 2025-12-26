@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as analyze_router
 from app.mock_llms import router as mock_router
@@ -37,6 +38,17 @@ app = FastAPI(
     description="Version control and regression testing for LLM APIs",
     version="1.0.0",
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",   # Vite
+        "http://localhost:3000",   # CRA
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Static & templates

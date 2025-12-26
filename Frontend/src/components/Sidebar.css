@@ -1,0 +1,362 @@
+.sidebar {
+  width: 320px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
+}
+
+.logo-text h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.logo-text .subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.btn-new-case {
+  width: 100%;
+  justify-content: center;
+  font-weight: 600;
+}
+
+/* Cases List */
+.cases-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  min-height: 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state p {
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+/* Case Items */
+.case-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.case-item.active {
+  border-color: var(--primary);
+  background: var(--surface-alt);
+  box-shadow: var(--shadow-sm);
+}
+
+.case-header {
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.case-header:hover {
+  background: var(--surface-alt);
+}
+
+.case-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.expand-icon {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.expand-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.case-info {
+  min-width: 0;
+}
+
+.case-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.case-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.case-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.case-item:hover .case-actions {
+  opacity: 1;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+  background: var(--surface);
+  color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+/* Versions List */
+.versions-list {
+  padding: 8px 8px 8px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.empty-versions {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.version-item {
+  padding: 8px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.version-item:hover {
+  background: var(--surface-alt);
+  transform: translateX(2px);
+}
+
+.version-item.active {
+  background: var(--surface);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.1);
+}
+
+.version-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.version-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-number {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge.deep-dive {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.version-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.score {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 28px;
+  text-align: center;
+}
+
+.score-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.score-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+.score-safe {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
+.version-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.verdict {
+  background: var(--surface);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.premium-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(135deg, 
+    rgba(102, 126, 234, 0.1) 0%, 
+    rgba(118, 75, 162, 0.1) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: var(--radius-md);
+}
+
+.premium-badge .badge.premium {
+  width: fit-content;
+  font-size: 12px;
+}
+
+.premium-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.free-tier {
+  text-align: center;
+  padding: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.free-tier p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+/* Scrollbar */
+.cases-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.cases-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cases-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.cases-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 280px;
+  }
+  
+  .sidebar-header {
+    padding: 16px;
+  }
+  
+  .case-actions {
+    opacity: 1;
+  }
+}

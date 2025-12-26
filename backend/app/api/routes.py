@@ -70,6 +70,7 @@ class CaseIdRequest(BaseModel):
     user_id: str
     case_id: str
 
+
 # ============================================
 # HELPER: Extract user_id from request
 # ============================================
@@ -645,7 +646,7 @@ class SubscriptionUpgradeRequest(BaseModel):
 @router.post("/subscription/check")
 async def check_subscription(request: SubscriptionCheckRequest):
     """Check user's subscription status - FIXED"""
-    user_id = get_user_id_from_payload(request.user_id)
+    user_id = request.user_id 
     user = get_user(user_id)
     
     if not user:
