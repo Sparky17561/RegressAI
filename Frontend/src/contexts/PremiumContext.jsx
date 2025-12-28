@@ -1,4 +1,3 @@
-// contexts/PremiumContext.jsx - FIXED VERSION
 import { createContext, useContext, useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 
@@ -13,88 +12,94 @@ export const usePremium = () => {
 };
 
 export const PremiumProvider = ({ children }) => {
-  const [subscription, setSubscription] = useState({
-    tier: 'free',
-    is_premium: false,
-    deep_dives_remaining: 0
+  const [subscription, setSubscription] = useState(() => {
+    // Initialize from localStorage
+    const cached = localStorage.getItem('premium_status');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (error) {
+        console.error('Failed to parse cached subscription:', error);
+      }
+    }
+    return {
+      tier: 'free',
+      is_premium: false,
+      deep_dives_remaining: 0
+    };
   });
-  const [loading, setLoading] = useState(false); // Start as false, not true
+  
+  const [loading, setLoading] = useState(true);
 
   const checkSubscription = async () => {
     try {
       setLoading(true);
       const data = await apiService.checkSubscription();
       
-      // Normalize tier value
-      const normalizedTier = String(data.tier).toLowerCase();
-      const normalizedData = {
-        tier: normalizedTier,
-        is_premium: Boolean(data.is_premium || normalizedTier === 'pro'),
-        deep_dives_remaining: parseInt(data.deep_dives_remaining) || 0
+      // SIMPLE LOGIC: Check for pro status
+      const isPro = data.subscription_tier === 'pro' || 
+                    data.tier === 'pro' || 
+                    data.is_premium === true ||
+                    data.success === true;
+      
+      const newSubscription = {
+        tier: isPro ? 'pro' : 'free',
+        is_premium: isPro,
+        deep_dives_remaining: data.deep_dives_remaining || 0
       };
       
-      setSubscription(normalizedData);
+      setSubscription(newSubscription);
+      localStorage.setItem('premium_status', JSON.stringify(newSubscription));
       
-      // Cache in localStorage
-      localStorage.setItem('premium_status', JSON.stringify(normalizedData));
-      
-      return normalizedData;
+      return newSubscription;
     } catch (error) {
       console.error('Failed to check subscription:', error);
-      
-      // Try to load from cache
-      const cached = localStorage.getItem('premium_status');
-      if (cached) {
-        try {
-          const cachedData = JSON.parse(cached);
-          setSubscription(cachedData);
-          return cachedData;
-        } catch (parseError) {
-          console.error('Failed to parse cached subscription:', parseError);
-        }
-      }
-      
-      // Return default
       return subscription;
     } finally {
       setLoading(false);
     }
   };
 
+  const updateSubscription = (newData) => {
+    console.log('Updating subscription with:', newData);
+    
+    const isPro = newData.subscription_tier === 'pro' || 
+                  newData.tier === 'pro' || 
+                  newData.is_premium === true ||
+                  newData.success === true;
+    
+    const updated = {
+      tier: isPro ? 'pro' : 'free',
+      is_premium: isPro,
+      deep_dives_remaining: newData.deep_dives_remaining || 5
+    };
+    
+    console.log('Setting subscription to:', updated);
+    setSubscription(updated);
+    localStorage.setItem('premium_status', JSON.stringify(updated));
+  };
+
   const decrementDeepDive = () => {
-    setSubscription(prev => ({
-      ...prev,
-      deep_dives_remaining: Math.max(0, prev.deep_dives_remaining - 1)
-    }));
+    setSubscription(prev => {
+      const newRemaining = Math.max(0, prev.deep_dives_remaining - 1);
+      const updated = {
+        ...prev,
+        deep_dives_remaining: newRemaining
+      };
+      localStorage.setItem('premium_status', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   useEffect(() => {
-    // Only check subscription if user is logged in
-    const userId = localStorage.getItem('user_id');
-    const authToken = localStorage.getItem('auth_token');
-    
-    if (userId && authToken) {
-      // User is logged in, check subscription
-      checkSubscription();
-    } else {
-      // User is not logged in, just load from cache
-      const cached = localStorage.getItem('premium_status');
-      if (cached) {
-        try {
-          const cachedData = JSON.parse(cached);
-          setSubscription(cachedData);
-        } catch (error) {
-          console.error('Failed to parse cached subscription:', error);
-        }
-      }
-      setLoading(false); // Ensure loading is false
-    }
+    checkSubscription();
   }, []);
 
   const value = {
     ...subscription,
     loading,
     checkSubscription,
+    updateSubscription,
     decrementDeepDive
   };
 

@@ -1,3 +1,4 @@
+// /src/services/api.js
 import axios from 'axios';
 import { authService } from './auth';
 
@@ -17,8 +18,7 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   
-  // ⚠️ FIX: Only add user_id if not already present
-  // This prevents duplication issues with subscription endpoints
+  // Add user_id to request data if not already present
   const userId = localStorage.getItem('user_id');
   if (userId && config.data) {
     // If data is FormData, append user_id if not already there
@@ -133,18 +133,15 @@ export const apiService = {
   },
   
   // Team & Collaboration
-// services/api.js - Update fetchTeamMembers function
-fetchTeamMembers: (caseId) => {
-  const userId = localStorage.getItem('user_id');
-  return api.post('/api/team/members', {
-    user_id: userId,
-    case_id: caseId
-  }).then(res => {
-    console.log('Team members response:', res.data); // Debug
-    // Extract members array from response object
-    return res.data.members || [];
-  });
-},
+  fetchTeamMembers: (caseId) => {
+    const userId = localStorage.getItem('user_id');
+    return api.post('/api/team/members', {
+      user_id: userId,
+      case_id: caseId
+    }).then(res => {
+      return res.data.members || [];
+    });
+  },
   
   inviteMember: (data) => {
     const userId = localStorage.getItem('user_id');
@@ -208,64 +205,84 @@ fetchTeamMembers: (caseId) => {
     }).then(res => res.data);
   },
   
-  // Premium & Subscriptions - FIXED VERSION
- // services/api.js - UPDATED checkSubscription function
-checkSubscription: () => {
-  const userId = localStorage.getItem('user_id');
-  console.log('checkSubscription - userId:', userId);
-  
-  // ✅ FIX: Return default free tier without making API call if no user_id
-  if (!userId) {
-    console.log('User not logged in, returning free tier');
-    return Promise.resolve({
-      tier: 'free',
-      is_premium: false,
-      deep_dives_remaining: 0,
-      deep_dive_reset_date: null
-    });
-  }
-  
-  const payload = { user_id: userId };
-  
-  return api.post('/api/subscription/check', payload)
-    .then(res => {
-      console.log('checkSubscription - response:', res.data);
-      return res.data;
-    })
-    .catch(error => {
-      console.error('Subscription check API failed:', error);
-      // Return default free tier on any error
-      return {
+  // Premium & Subscriptions
+  checkSubscription: () => {
+    const userId = localStorage.getItem('user_id');
+    
+    // Return default free tier without making API call if no user_id
+    if (!userId) {
+      return Promise.resolve({
         tier: 'free',
         is_premium: false,
         deep_dives_remaining: 0,
         deep_dive_reset_date: null
-      };
-    });
-},
+      });
+    }
+    
+    return api.post('/api/subscription/check', { user_id: userId })
+      .then(res => res.data)
+      .catch(error => {
+        console.error('Subscription check API failed:', error);
+        // Return default free tier on any error
+        return {
+          tier: 'free',
+          is_premium: false,
+          deep_dives_remaining: 0,
+          deep_dive_reset_date: null
+        };
+      });
+  },
   
   upgradeToPro: () => {
     const userId = localStorage.getItem('user_id');
-    // ⚠️ FIX: Create a new object to avoid interceptor issues
-    const payload = { user_id: userId };
+    if (!userId) {
+      return Promise.reject(new Error('User not logged in'));
+    }
     
-    return api.post('/api/subscription/upgrade', payload).then(res => res.data);
+    return api.post('/api/subscription/upgrade', { user_id: userId })
+      .then(res => res.data)
+      .catch(error => {
+        console.error('Demo upgrade failed:', error);
+        throw error;
+      });
   },
   
+  // Payment Methods
   createOrder: () => {
     const userId = localStorage.getItem('user_id');
-    // ⚠️ FIX: Create a new object to avoid interceptor issues
-    const payload = { user_id: userId };
+    if (!userId) {
+      return Promise.reject(new Error('User not logged in'));
+    }
     
-    return api.post('/api/payments/create-order', payload).then(res => res.data);
+    return api.post('/api/payments/create-order', { user_id: userId })
+      .then(res => {
+        console.log('Order created:', res.data);
+        return res.data;
+      })
+      .catch(error => {
+        console.error('Create order failed:', error);
+        throw error;
+      });
   },
   
   verifyPayment: (paymentData) => {
     const userId = localStorage.getItem('user_id');
-    // ⚠️ FIX: Create a new object to avoid interceptor issues
-    const payload = { user_id: userId, ...paymentData };
+    if (!userId) {
+      return Promise.reject(new Error('User not logged in'));
+    }
     
-    return api.post('/api/payments/verify', payload).then(res => res.data);
+    return api.post('/api/payments/verify', {
+      user_id: userId,
+      ...paymentData
+    })
+    .then(res => {
+      console.log('Payment verified:', res.data);
+      return res.data;
+    })
+    .catch(error => {
+      console.error('Payment verification failed:', error);
+      throw error;
+    });
   }
 };
 
@@ -280,7 +297,6 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       
       try {
-        // Try to refresh token (Firebase handles this automatically)
         const token = await authService.getAuthToken();
         if (token) {
           originalRequest.headers.Authorization = `Bearer ${token}`;
@@ -290,7 +306,6 @@ api.interceptors.response.use(
         console.error('Token refresh failed:', refreshError);
       }
       
-      // If refresh failed, logout and redirect
       await authService.signOut();
       window.location.href = '/login';
     }

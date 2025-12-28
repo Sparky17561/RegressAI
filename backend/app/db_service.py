@@ -338,13 +338,12 @@ def get_version_for_user(version_id: str, user_id: str) -> Optional[Version]:
 
 
 # In db_service.py - Update list_versions function
+# In db_service.py - Replace the list_versions function with this:
 
 def list_versions(case_id: str, user_id: str) -> List[VersionMetadata]:
     """
     List all versions for a case.
-    Owners see their versions.
-    Collaborators see owner's versions.
-    🔥 NOW INCLUDES is_deep_dive FLAG
+    🔥 FIXED: Now properly extracts is_deep_dive from analysis_response
     """
     db = get_db()
 
@@ -367,6 +366,7 @@ def list_versions(case_id: str, user_id: str) -> List[VersionMetadata]:
         # 3️⃣ Collaborator → fetch ALL versions of case
         query = {"case_id": case_id}
 
+    # 🔥 FIX: Fetch full analysis_response to check is_deep_dive
     docs = db.versions.find(
         query,
         {
@@ -377,17 +377,23 @@ def list_versions(case_id: str, user_id: str) -> List[VersionMetadata]:
             "cookedness_score": 1,
             "verdict": 1,
             "created_at": 1,
-            "analysis_response.is_deep_dive": 1  # 🔥 ADD THIS
+            "analysis_response": 1  # 🔥 FETCH FULL OBJECT
         }
     ).sort("version_number", -1)
 
-    # 🔥 FIX: Extract is_deep_dive from nested structure
     result = []
     for doc in docs:
-        # Check if is_deep_dive exists in analysis_response
-        is_deep_dive = False
-        if "analysis_response" in doc:
-            is_deep_dive = doc["analysis_response"].get("is_deep_dive", False)
+        # 🔥 CRITICAL FIX: Check is_deep_dive in analysis_response
+        analysis_response = doc.get("analysis_response", {})
+        is_deep_dive = analysis_response.get("is_deep_dive", False)
+        
+        # Also check if deep_dive_metrics exist (backup check)
+        if not is_deep_dive and "deep_dive_metrics" in analysis_response:
+            is_deep_dive = True
+        
+        # Also check if visualization_data exists (backup check)
+        if not is_deep_dive and "visualization_data" in analysis_response:
+            is_deep_dive = True
         
         version_meta = {
             "version_id": doc["version_id"],
@@ -396,11 +402,36 @@ def list_versions(case_id: str, user_id: str) -> List[VersionMetadata]:
             "cookedness_score": doc["cookedness_score"],
             "verdict": doc["verdict"],
             "created_at": doc["created_at"],
-            "is_deep_dive": is_deep_dive  # 🔥 ADD THIS
+            "is_deep_dive": is_deep_dive  # 🔥 NOW PROPERLY SET
         }
+        
         result.append(VersionMetadata(**version_meta))
     
+    print(f"[DB] Returning {len(result)} versions, {sum(1 for v in result if v.is_deep_dive)} are deep dives")
     return result
+
+
+# Also add this helper function to verify deep dive data integrity:
+
+def verify_deep_dive_data(version_id: str) -> Dict[str, Any]:
+    """Debug helper to check what data exists for a version"""
+    db = get_db()
+    doc = db.versions.find_one({"version_id": version_id})
+    
+    if not doc:
+        return {"error": "Version not found"}
+    
+    analysis_response = doc.get("analysis_response", {})
+    
+    return {
+        "version_id": version_id,
+        "has_is_deep_dive_flag": "is_deep_dive" in analysis_response,
+        "is_deep_dive_value": analysis_response.get("is_deep_dive", False),
+        "has_deep_dive_metrics": "deep_dive_metrics" in analysis_response,
+        "has_visualization_data": "visualization_data" in analysis_response,
+        "deep_dive_metrics_keys": list(analysis_response.get("deep_dive_metrics", {}).keys()),
+        "visualization_data_keys": list(analysis_response.get("visualization_data", {}).keys())
+    }
 
 
 def get_case_with_versions(case_id: str, user_id: str) -> Optional[CaseWithVersions]:

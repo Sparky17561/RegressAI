@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { apiService } from '../../services/api';
 import { usePremium } from '../../contexts/PremiumContext';
+import { loadRazorpayScript } from '../../services/razorpay';
 import './PricingModal.css';
 
 const PricingModal = ({ isOpen, onClose, onUpgrade }) => {
   const [loading, setLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const { checkSubscription } = usePremium();
+  const { checkSubscription, updateSubscription } = usePremium();
 
   const plans = [
     {
@@ -54,50 +55,119 @@ const PricingModal = ({ isOpen, onClose, onUpgrade }) => {
     try {
       setPaymentLoading(true);
       
-      // Create order
+      console.log('Creating order...');
+      
+      // Create order on your backend
       const order = await apiService.createOrder();
+      
+      console.log('Order created:', order);
+      
+      // Check for order_id
+      if (!order || !order.order_id) {
+        console.error('Order missing order_id:', order);
+        throw new Error('Failed to create order. Please try again.');
+      }
+      
+      console.log('Loading Razorpay script...');
+      
+      // Load Razorpay script
+      await loadRazorpayScript();
+      
+      if (!window.Razorpay) {
+        throw new Error('Failed to load Razorpay payment gateway');
+      }
+      
+      console.log('Initializing Razorpay checkout...');
+      
+      // Get user info from localStorage for prefill
+      const userName = localStorage.getItem('user_name') || '';
+      const userEmail = localStorage.getItem('user_email') || '';
+      const userPhone = localStorage.getItem('user_phone') || '';
       
       // Initialize Razorpay
       const options = {
-        key: order.key_id,
-        amount: order.amount,
-        currency: order.currency,
-        name: "RegressAI Pro",
+        key: order.key_id || import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount, // Amount in paise (₹399 = 39900 paise)
+        currency: order.currency || 'INR',
+        name: "RegressAI",
         description: "Pro Plan – ₹399/month",
-        order_id: order.order_id,
+        order_id: order.order_id, // Use order_id from backend
         handler: async (response) => {
+          console.log('Payment successful, verifying...', response);
+          
           try {
-            // Verify payment
-            await apiService.verifyPayment({
+            // Verify payment with your backend
+            const verification = await apiService.verifyPayment({
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature
             });
             
-            alert("🎉 Payment successful! Pro unlocked.");
-            await checkSubscription();
-            onClose();
-            if (onUpgrade) onUpgrade();
+            console.log('Payment verification result:', verification);
+            
+            if (verification.success) {
+              // Immediately update subscription state
+              updateSubscription({
+                tier: 'pro',
+                subscription_tier: 'pro',
+                is_premium: true,
+                deep_dives_remaining: verification.deep_dives_remaining || 5,
+                ...verification
+              });
+              
+              alert("🎉 Payment successful! Pro features are now unlocked.");
+              
+              // Also refresh from server to be safe
+              await checkSubscription();
+              
+              onClose();
+              if (onUpgrade) onUpgrade();
+            } else {
+              alert("❌ Payment verification failed. Please contact support.");
+            }
           } catch (error) {
-            alert("Payment verification failed. Contact support.");
+            console.error('Payment verification error:', error);
+            alert("Payment verification failed. Please contact support.");
+          } finally {
+            setPaymentLoading(false);
           }
+        },
+        prefill: {
+          name: userName,
+          email: userEmail,
+          contact: userPhone
         },
         theme: {
           color: "#6366f1"
         },
         modal: {
           ondismiss: () => {
+            console.log('Payment modal dismissed');
             setPaymentLoading(false);
-          }
+          },
+          escape: true,
+          backdropclose: false
+        },
+        notes: {
+          source: "regressai_web_app"
         }
       };
       
+      console.log('Opening Razorpay modal with options:', options);
+      
+      // Open Razorpay checkout
       const rzp = new window.Razorpay(options);
       rzp.open();
       
+      rzp.on('payment.failed', (response) => {
+        console.error('Payment failed:', response.error);
+        alert(`Payment failed: ${response.error.description || 'Please try again.'}`);
+        setPaymentLoading(false);
+      });
+      
     } catch (error) {
       console.error('Upgrade failed:', error);
-      alert(`Failed to initiate payment: ${error.message}`);
+      alert(`Failed to initiate payment: ${error.message || 'Please try again.'}`);
       setPaymentLoading(false);
     }
   };
@@ -105,10 +175,21 @@ const PricingModal = ({ isOpen, onClose, onUpgrade }) => {
   const handleDemoUpgrade = async () => {
     try {
       setLoading(true);
-      await apiService.upgradeToPro();
+      const result = await apiService.upgradeToPro();
+      
+      // Update subscription immediately
+      updateSubscription({
+        tier: 'pro',
+        is_premium: true,
+        deep_dives_remaining: 5,
+        ...result
+      });
       
       alert("🎉 Demo upgrade successful! Pro features unlocked.");
+      
+      // Also refresh from server
       await checkSubscription();
+      
       onClose();
       if (onUpgrade) onUpgrade();
     } catch (error) {

@@ -26,7 +26,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   
   const { currentUser, logout } = useAuth();
-  const { isPremium, deepDivesRemaining, checkSubscription } = usePremium();
+  const { is_premium: isPremium, deep_dives_remaining: deepDivesRemaining, checkSubscription } = usePremium();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -70,8 +70,26 @@ const Dashboard = () => {
       setVersions(caseData.versions || []);
       setTeamMembers(members);
       
+      // 🔥 FIX: Load the FULL version data, not just metadata
       if (caseData.versions?.length > 0) {
-        setSelectedVersion(caseData.versions[0]);
+        const latestVersionMeta = caseData.versions[0];
+        
+        // Fetch the complete version with all nested data
+        const fullVersion = await apiService.fetchVersion(latestVersionMeta.version_id);
+        
+        console.log('📦 Loaded full version:', {
+          version_id: fullVersion.version_id,
+          has_analysis_response: !!fullVersion.analysis_response,
+          is_deep_dive: fullVersion.analysis_response?.is_deep_dive,
+          has_deep_dive_metrics: !!fullVersion.analysis_response?.deep_dive_metrics,
+          has_visualization_data: !!fullVersion.analysis_response?.visualization_data
+        });
+        
+        setSelectedVersion(fullVersion);
+        
+        // Also load comments
+        const commentsData = await apiService.fetchComments(fullVersion.version_id);
+        setComments(commentsData.comments || []);
       }
     } catch (error) {
       console.error('Failed to load case details:', error);
@@ -91,11 +109,13 @@ const Dashboard = () => {
 
   const handleRunAnalysis = async (inputs) => {
     try {
+      console.log('Running analysis with inputs:', inputs);
+      
       const payload = {
-        ...inputs,
         user_id: currentUser.uid,
         case_id: activeCase?.case_id || null,
-        case_name: activeCase?.name || 'Untitled Case'
+        case_name: activeCase?.name || 'Untitled Case',
+        ...inputs
       };
       
       const result = await apiService.runAnalysis(payload);
@@ -103,7 +123,14 @@ const Dashboard = () => {
       // Update version list
       const updatedCase = await apiService.fetchCase(result.case_id);
       setVersions(updatedCase.versions || []);
-      setSelectedVersion(result);
+      
+      // 🔥 FIX: Fetch full version to ensure we have all nested data
+      const fullVersion = await apiService.fetchVersion(result.version_id);
+      setSelectedVersion(fullVersion);
+      
+      // Load comments
+      const commentsData = await apiService.fetchComments(fullVersion.version_id);
+      setComments(commentsData.comments || []);
       
       // Refresh cases list
       const casesData = await apiService.fetchCases();
@@ -117,35 +144,60 @@ const Dashboard = () => {
   };
 
   const handleDeepDive = async (inputs) => {
-    if (!isPremium) {
-      setPricingOpen(true);
-      return;
-    }
-    
-    if (deepDivesRemaining <= 0) {
-      alert('No deep dives remaining this month');
-      return;
-    }
+    console.log('🔥 Dashboard handleDeepDive called');
     
     try {
+      const freshStatus = await checkSubscription();
+      console.log('Fresh subscription in Dashboard:', freshStatus);
+      
+      if (!freshStatus.is_premium) {
+        console.log('Not premium, opening pricing modal');
+        setPricingOpen(true);
+        return;
+      }
+      
+      if (freshStatus.deep_dives_remaining <= 0) {
+        alert('No deep dives remaining this month');
+        return;
+      }
+      
       const payload = {
-        ...inputs,
         user_id: currentUser.uid,
         case_id: activeCase?.case_id || null,
         case_name: activeCase?.name || 'Deep Dive Analysis',
+        ...inputs,
         n_cases: Math.max(inputs.n_cases || 3, 10)
       };
       
       const result = await apiService.runDeepDive(payload);
       
+      console.log('✅ Deep dive completed, version_id:', result.version_id);
+      
       // Update version list
       const updatedCase = await apiService.fetchCase(result.case_id);
       setVersions(updatedCase.versions || []);
-      setSelectedVersion(result);
+      
+      // 🔥 FIX: Fetch the full version to ensure we have all nested data
+      const fullVersion = await apiService.fetchVersion(result.version_id);
+      
+      console.log('📦 Full deep dive version loaded:', {
+        version_id: fullVersion.version_id,
+        is_deep_dive: fullVersion.analysis_response?.is_deep_dive,
+        has_deep_dive_metrics: !!fullVersion.analysis_response?.deep_dive_metrics,
+        has_visualization_data: !!fullVersion.analysis_response?.visualization_data,
+        deep_dive_metrics_keys: Object.keys(fullVersion.analysis_response?.deep_dive_metrics || {}),
+        visualization_data_keys: Object.keys(fullVersion.analysis_response?.visualization_data || {})
+      });
+      
+      setSelectedVersion(fullVersion);
+      
+      // Load comments
+      const commentsData = await apiService.fetchComments(fullVersion.version_id);
+      setComments(commentsData.comments || []);
       
       // Refresh cases and subscription
       await Promise.all([
-        apiService.fetchCases().then(setCases),
+        apiService.fetchCases().then(data => setCases(data.cases || [])),
         checkSubscription()
       ]);
       
@@ -158,11 +210,20 @@ const Dashboard = () => {
 
   const handleSelectVersion = async (version) => {
     try {
-      const versionData = await apiService.fetchVersion(version.version_id);
-      setSelectedVersion(versionData);
+      // 🔥 Always fetch full version data
+      const fullVersion = await apiService.fetchVersion(version.version_id);
+      
+      console.log('📦 Version selected:', {
+        version_id: fullVersion.version_id,
+        is_deep_dive: fullVersion.analysis_response?.is_deep_dive,
+        has_deep_dive_metrics: !!fullVersion.analysis_response?.deep_dive_metrics,
+        has_visualization_data: !!fullVersion.analysis_response?.visualization_data
+      });
+      
+      setSelectedVersion(fullVersion);
       
       // Load comments for this version
-      const commentsData = await apiService.fetchComments(versionData.version_id);
+      const commentsData = await apiService.fetchComments(fullVersion.version_id);
       setComments(commentsData.comments || []);
     } catch (error) {
       console.error('Failed to load version:', error);
@@ -262,7 +323,6 @@ const Dashboard = () => {
           onCreateCase={handleCreateCase}
           onSelectCase={loadCaseDetails}
           onSelectVersion={handleSelectVersion}
-          isPremium={isPremium}
         />
 
         <div className="main-panel">
@@ -273,8 +333,6 @@ const Dashboard = () => {
             onDeepDive={handleDeepDive}
             onInvite={() => setInviteOpen(true)}
             teamMembers={teamMembers}
-            isPremium={isPremium}
-            deepDivesRemaining={deepDivesRemaining}
           />
 
           <ResultsPanel

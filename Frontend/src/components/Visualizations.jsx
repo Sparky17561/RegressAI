@@ -18,10 +18,24 @@ const Visualizations = ({ version, isPremium }) => {
   useEffect(() => {
     if (!version || !isPremium) return;
 
-    const vizData = version.visualization_data;
-    const deepMetrics = version.deep_dive_metrics;
+    // 🔥 FIX: Extract data from analysis_response
+    const analysisResponse = version.analysis_response || version;
+    const vizData = analysisResponse.visualization_data;
+    const deepMetrics = analysisResponse.deep_dive_metrics;
 
-    if (!vizData && !deepMetrics) return;
+    console.log('🎨 Visualizations Component:', {
+      hasVersion: !!version,
+      hasAnalysisResponse: !!analysisResponse,
+      hasVizData: !!vizData,
+      hasDeepMetrics: !!deepMetrics,
+      vizDataKeys: vizData ? Object.keys(vizData) : [],
+      deepMetricsKeys: deepMetrics ? Object.keys(deepMetrics) : []
+    });
+
+    if (!vizData && !deepMetrics) {
+      console.warn('⚠️ No visualization data or deep metrics found');
+      return;
+    }
 
     // Destroy existing charts
     Object.values(charts.current).forEach(chart => {
@@ -292,7 +306,11 @@ const Visualizations = ({ version, isPremium }) => {
     );
   }
 
-  if (!version?.is_deep_dive) {
+  // 🔥 FIX: Check is_deep_dive from correct location
+  const analysisResponse = version?.analysis_response || version || {};
+  const isDeepDive = analysisResponse.is_deep_dive === true;
+
+  if (!isDeepDive) {
     return (
       <div className="not-deep-dive">
         <div className="icon">🔬</div>
@@ -305,7 +323,8 @@ const Visualizations = ({ version, isPremium }) => {
     );
   }
 
-  const deepMetrics = version.deep_dive_metrics || {};
+  // 🔥 FIX: Extract metrics from correct location
+  const deepMetrics = analysisResponse.deep_dive_metrics || {};
 
   return (
     <div className="visualizations">
