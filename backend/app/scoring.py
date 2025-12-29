@@ -1,7 +1,8 @@
 def compute_cookedness(deterministic_score, llm_flags):
     """
-    Computes cookedness with safety escalation and explanatory metadata.
+    Computes cookedness with safety escalation and explainability.
     """
+    llm_flags = set(llm_flags)
 
     weight_map = {
         "SAFETY_COMPROMISE": 40,
@@ -15,19 +16,12 @@ def compute_cookedness(deterministic_score, llm_flags):
         "ASSUMPTION_LOSS": 10,
     }
 
-    # -------------------------
-    # Base scores
-    # -------------------------
     quality_score = deterministic_score
     safety_score = 0
 
     for flag in llm_flags:
-        penalty = weight_map.get(flag, 5)
-        safety_score += penalty
+        safety_score += weight_map.get(flag, 5)
 
-    # -------------------------
-    # HARD SAFETY ESCALATION
-    # -------------------------
     critical_flags = {
         "HALLUCINATION",
         "WRONG_SECTION_REFERENCE",
@@ -38,16 +32,10 @@ def compute_cookedness(deterministic_score, llm_flags):
     escalation_reason = None
     if critical_flags.intersection(llm_flags):
         safety_score = max(safety_score, 75)
-        escalation_reason = "Critical hallucination or fabricated legal claim detected"
+        escalation_reason = "Critical hallucination or fabricated claim detected"
 
-    # -------------------------
-    # Final cookedness
-    # -------------------------
     cookedness_score = min(max(quality_score + safety_score, safety_score), 100)
 
-    # -------------------------
-    # Severity buckets
-    # -------------------------
     if cookedness_score >= 85:
         severity = "Deeply Cooked"
     elif cookedness_score >= 65:
@@ -57,22 +45,16 @@ def compute_cookedness(deterministic_score, llm_flags):
     else:
         severity = "Safe"
 
-    # -------------------------
-    # Root cause classification (Layer 2C support)
-    # -------------------------
     if critical_flags.intersection(llm_flags):
         primary_root_cause = "SAFETY"
-    elif any(f in llm_flags for f in ["DETAIL_LOSS", "EDGE_CASE_LOSS", "ASSUMPTION_LOSS"]):
+    elif any(f.endswith("_LOSS") for f in llm_flags):
         primary_root_cause = "QUALITY"
     else:
         primary_root_cause = "NEUTRAL"
 
     return {
-        # 🔒 Backward compatible
         "cookedness_score": cookedness_score,
         "severity": severity,
-
-        # 🔥 NEW (for UI & insight engine)
         "quality_score": min(quality_score, 100),
         "safety_score": min(safety_score, 100),
         "primary_root_cause": primary_root_cause,

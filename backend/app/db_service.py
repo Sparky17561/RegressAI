@@ -232,7 +232,6 @@ def delete_case(case_id: str, user_id: str) -> bool:
 # ==========================================================
 
 # In db_service.py - Update create_version function
-
 def create_version(
     case_id: str,
     user_id: str,
@@ -241,44 +240,68 @@ def create_version(
 ) -> Version:
     """
     Create an immutable version snapshot.
-    Extracts key fields from canonical response format.
+    FIXED:
+    - Correct deterministic flag extraction
+    - Correct root cause extraction from cookedness
+    - Safe defaults (no silent nulls)
+    - Compatible with unified + deep dive analysis
     """
     db = get_db()
 
-    case = get_case(case_id, user_id)
+    case = get_case_for_user(case_id, user_id)
     if not case:
         raise ValueError("Case not found")
 
     next_version = case.version_count + 1
 
-    # Extract from canonical format
+    # -------------------------------
+    # Canonical extraction
+    # -------------------------------
     evaluation = analysis_response.get("evaluation", {})
     scores = analysis_response.get("scores", {})
     verdict_obj = analysis_response.get("verdict", {})
-    
-    cookedness_score = scores.get("cookedness", {}).get("score", 0)
-    verdict = verdict_obj.get("final", "Unknown")
+
+    cookedness_obj = scores.get("cookedness", {})
+
+    cookedness_score = cookedness_obj.get("cookedness_score", 0)
     deterministic_score = scores.get("deterministic_score", 0)
+    verdict = verdict_obj.get("final", "Unknown")
     test_case_count = len(analysis_response.get("test_cases", []))
-    
-    # Extract root causes
-    root_causes = []
-    if evaluation.get("safety_override", {}).get("triggered"):
-        primary = evaluation["safety_override"].get("primary_root_cause")
-        if primary:
-            root_causes.append(primary)
-    
-    # Add other flags as secondary root causes
-    det_flags = evaluation.get("deterministic", {}).get("flags", [])
-    root_causes.extend(det_flags[:3])  # Top 3 flags
-    
+
+    # -------------------------------
+    # Root cause extraction (FIXED)
+    # -------------------------------
+    root_causes: List[str] = []
+
+    # Primary root cause comes from cookedness now
+    primary_root = cookedness_obj.get("primary_root_cause")
+    if primary_root:
+        root_causes.append(primary_root)
+
+    # Deterministic flags (FIXED KEY)
+    deterministic_flags = (
+        evaluation
+        .get("deterministic", {})
+        .get("deterministic_flags", [])
+    )
+
+    # Add up to 3 deterministic flags as secondary causes
+    for flag in deterministic_flags[:3]:
+        if flag not in root_causes:
+            root_causes.append(flag)
+
+    # -------------------------------
+    # Build Version object
+    # -------------------------------
     version = Version(
         version_id=f"ver_{uuid.uuid4().hex[:12]}",
         case_id=case_id,
         user_id=user_id,
         version_number=next_version,
+
         request_payload=request_payload,
-        analysis_response=analysis_response,  # Store full canonical format
+        analysis_response=analysis_response,  # FULL canonical payload
+
         cookedness_score=cookedness_score,
         verdict=verdict,
         deterministic_score=deterministic_score,
@@ -286,6 +309,9 @@ def create_version(
         root_causes=root_causes
     )
 
+    # -------------------------------
+    # Persist
+    # -------------------------------
     db.versions.insert_one(version.model_dump())
 
     db.cases.update_one(
@@ -298,6 +324,7 @@ def create_version(
     )
 
     return version
+
 
 
 def get_version(version_id: str, user_id: str) -> Optional[Version]:
@@ -438,7 +465,7 @@ def get_case_with_versions(case_id: str, user_id: str) -> Optional[CaseWithVersi
     """
     Fetch case with version metadata.
     """
-    case = get_case(case_id, user_id)
+    case = get_case_for_user(case_id, user_id)
     if not case:
         return None
 

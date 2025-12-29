@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from groq import Groq
 from app.config import OLD_GROQ_KEY_ENV, NEW_GROQ_KEY_ENV
+
 # ============================================================
 # ROUTER
 # ============================================================
@@ -33,11 +34,10 @@ new_client = Groq(api_key=NEW_GROQ_KEY)
 MODEL_NAME = "llama-3.3-70b-versatile"
 
 # ============================================================
-# PROMPT TEMPLATES (VISIBLE, USER-CONTROLLED)
+# SYSTEM PROMPTS (SEPARATED FROM USER QUESTIONS)
 # ============================================================
 
-OLD_LEGAL_PROMPT = """
-You are a cautious legal-information assistant for Indian income tax.
+OLD_LEGAL_SYSTEM = """You are a cautious legal-information assistant for Indian income tax.
 
 You MUST:
 - Clearly list assumptions
@@ -46,90 +46,69 @@ You MUST:
 - Avoid giving direct advice
 - Include a legal disclaimer
 
-User Question:
-{question}
-"""
+Provide helpful, accurate information while being appropriately cautious about legal matters."""
 
-NEW_LEGAL_PROMPT = """
-You are a legal-information assistant for Indian income tax.
-You are NOT a legal advisor.
+NEW_LEGAL_SYSTEM = """You are an Indian income tax information assistant providing general guidance only.
+You are NOT a legal advisor or tax consultant.
 
-Your primary objective is:
-→ Prevent false certainty
-→ Prevent invented legal rules
-→ Prevent unverified specificity
+Core Principles:
+- State key assumptions clearly before answering
+- Use conditional language ("generally", "may", "depends on", "subject to")
+- Mention relevant exceptions or edge cases when applicable
+- Never invent specific rules, rates, section numbers, or time periods unless you are confident
+- If uncertain about any detail, explicitly acknowledge it
 
-STRICT RULES (MANDATORY):
-
-1. You MUST NOT state any legal rule, rate, time period, or condition unless you are confident it is correct.
-   - If uncertain, explicitly say so.
-   - Use phrases like:
-     "Generally",
-     "Subject to specific conditions",
-     "This depends on interpretation and facts",
-     "You should verify this with a professional".
-
-2. When discussing inherited assets, residency, DTAA, or capital gains:
-   - Explicitly state what you are NOT covering.
-   - Explicitly state assumptions.
-
-3. You MUST prefer:
-   - Conditional explanations
-   - Ranges instead of absolutes
-   - Scenarios instead of conclusions
-
-4. You MUST NOT invent:
-   - Holding periods
-   - Tax rates
-   - Section numbers
-   - Exemptions
-   unless you are confident.
-
-5. If a question touches complex or disputed areas:
-   - You MUST say: 
-     "This area is nuanced and often misunderstood."
-
-RESPONSE FORMAT (FIXED):
+Response Structure (follow this format):
 
 Assumptions:
-- (list only what is strictly necessary)
+- List only what is strictly necessary to understand the context
 
 High-Level Explanation:
-- (conceptual explanation without numeric certainty)
+- Provide conceptual explanation of the tax treatment
+- Focus on principles rather than absolute specifics
 
 What Depends on Facts:
-- (bullet list of variables that change the answer)
+- Note the key variables that would change the answer
+- Mention any thresholds or conditions that matter
 
-Common Misunderstandings:
-- (1–2 bullets of what people usually get wrong)
+Important Considerations:
+- Highlight 1-2 common misunderstandings if relevant
+- Note any edge cases or exceptions
 
-Next Safe Step:
-- (what the user should do next)
+Next Steps:
+- Suggest what the user should do (typically: consult a tax professional for personalized advice)
 
 Disclaimer:
-- (1 short line)
+- One brief line noting this is general information, not professional advice
 
-FAILURE CONDITION:
-If you are unsure → say so.
-Clarity > Completeness.
-
-
-"""
+Remember: If you're uncertain about a specific rule, rate, or timeframe, say so explicitly. Clarity and accuracy matter more than completeness."""
 
 # ============================================================
-# GROQ INFERENCE HELPER
+# GROQ INFERENCE HELPER (FIXED)
 # ============================================================
 
-def run_groq(client: Groq, prompt: str) -> str:
+def run_groq(client: Groq, system_prompt: str, user_question: str) -> str:
+    """
+    Properly structured API call with system/user message separation.
+    
+    Args:
+        client: Groq client instance
+        system_prompt: Instructions on how the assistant should behave
+        user_question: The actual user's question
+    
+    Returns:
+        The model's response as a string
+    """
     completion = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_question}
         ],
-        temperature=0.2,
-        max_tokens=700,
+        temperature=0.5,  # Higher for natural variation in responses
+        max_tokens=2000,  # Sufficient for detailed legal explanations
     )
-
+    
     return completion.choices[0].message.content.strip()
 
 
@@ -139,9 +118,15 @@ def run_groq(client: Groq, prompt: str) -> str:
 
 @router.post("/old-legal-ai")
 def old_legal_ai(req: PromptRequest):
-    prompt = OLD_LEGAL_PROMPT.format(question=req.prompt)
-    answer = run_groq(old_client, prompt)
-
+    """
+    Old legal AI endpoint using the original prompt style.
+    """
+    answer = run_groq(
+        client=old_client,
+        system_prompt=OLD_LEGAL_SYSTEM,
+        user_question=req.prompt
+    )
+    
     return {
         "choices": [
             {
@@ -159,9 +144,15 @@ def old_legal_ai(req: PromptRequest):
 
 @router.post("/new-legal-ai")
 def new_legal_ai(req: PromptRequest):
-    prompt = NEW_LEGAL_PROMPT.format(question=req.prompt)
-    answer = run_groq(new_client, prompt)
-
+    """
+    New legal AI endpoint using the improved prompt style.
+    """
+    answer = run_groq(
+        client=new_client,
+        system_prompt=NEW_LEGAL_SYSTEM,
+        user_question=req.prompt
+    )
+    
     return {
         "choices": [
             {
@@ -171,3 +162,41 @@ def new_legal_ai(req: PromptRequest):
             }
         ]
     }
+
+
+# ============================================================
+# DIAGNOSTIC ENDPOINT (FOR TESTING)
+# ============================================================
+
+@router.get("/test-apis")
+def test_apis():
+    """
+    Quick sanity check to verify both APIs are responding properly.
+    Visit: http://localhost:8000/mock/test-apis
+    """
+    test_question = "What is the basic income tax rate for individuals in India?"
+    
+    try:
+        old_response = run_groq(old_client, OLD_LEGAL_SYSTEM, test_question)
+        new_response = run_groq(new_client, NEW_LEGAL_SYSTEM, test_question)
+        
+        return {
+            "status": "success",
+            "test_question": test_question,
+            "old_api": {
+                "response": old_response,
+                "length": len(old_response),
+                "responding": len(old_response) > 100
+            },
+            "new_api": {
+                "response": new_response,
+                "length": len(new_response),
+                "responding": len(new_response) > 100
+            },
+            "both_working": len(old_response) > 100 and len(new_response) > 100
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }

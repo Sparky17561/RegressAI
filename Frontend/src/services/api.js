@@ -35,6 +35,40 @@ api.interceptors.request.use(async (config) => {
   
   return config;
 });
+// inside /src/services/api.js (replace fetchVersion)
+function removeNulls(obj) {
+  if (obj === null || obj === undefined) return undefined;
+  if (Array.isArray(obj)) {
+    const arr = obj
+      .map(removeNulls)
+      .filter((v) => v !== undefined);
+    return arr;
+  }
+  if (typeof obj === 'object') {
+    const out = {};
+    Object.keys(obj).forEach((k) => {
+      const v = removeNulls(obj[k]);
+      if (v !== undefined) out[k] = v;
+    });
+    // if object becomes empty, return empty object (not undefined) — preserves structure
+    return Object.keys(out).length ? out : {};
+  }
+  // primitive (string/number/boolean)
+  return obj;
+}
+
+const normalizeVersionForFrontend = (version) => {
+  if (!version) return version;
+  // ensure analysis_response exists
+  const rawAr = version.analysis_response || {};
+  // deep-clean null values inside analysis_response
+  const cleanedAr = removeNulls(rawAr);
+  // put cleaned analysis_response back, keep original top-level metadata
+  return {
+    ...version,
+    analysis_response: cleanedAr,
+  };
+};
 
 export const apiService = {
   // User Management
@@ -104,8 +138,19 @@ export const apiService = {
     return api.post('/api/versions/get', {
       user_id: userId,
       version_id: versionId
-    }).then(res => res.data);
+    })
+    .then(res => {
+      const version = res.data || {};
+      // Normalize/clean so frontend snapshot is tidy and shows full analysis_response
+      return normalizeVersionForFrontend(version);
+    })
+    .catch(err => {
+      // bubble up
+      console.error('[API] fetchVersion failed', err);
+      throw err;
+    });
   },
+
   
   listVersions: (caseId) => {
     const userId = localStorage.getItem('user_id');
@@ -205,33 +250,45 @@ export const apiService = {
     }).then(res => res.data);
   },
   
-  // Premium & Subscriptions
-  checkSubscription: () => {
-    const userId = localStorage.getItem('user_id');
-    
-    // Return default free tier without making API call if no user_id
-    if (!userId) {
-      return Promise.resolve({
+// Replace the checkSubscription function in api.js with this:
+
+checkSubscription: () => {
+  const userId = localStorage.getItem('user_id');
+  
+  if (!userId) {
+    return Promise.resolve({
+      tier: 'free',
+      is_premium: false,
+      deep_dives_remaining: 0,
+      deep_dive_reset_date: null
+    });
+  }
+  
+  return api.post('/api/subscription/check', { user_id: userId })
+    .then(res => {
+      console.log('[API] Subscription check response:', res.data);
+      
+      // Backend now returns lowercase strings
+      const tier = (res.data.tier || 'free').toLowerCase();
+      const isPremium = tier === 'pro';
+      
+      return {
+        tier: tier,  // "free" or "pro" as lowercase string
+        is_premium: isPremium,
+        deep_dives_remaining: parseInt(res.data.deep_dives_remaining || 0),
+        deep_dive_reset_date: res.data.deep_dive_reset_date
+      };
+    })
+    .catch(error => {
+      console.error('Subscription check API failed:', error);
+      return {
         tier: 'free',
         is_premium: false,
         deep_dives_remaining: 0,
         deep_dive_reset_date: null
-      });
-    }
-    
-    return api.post('/api/subscription/check', { user_id: userId })
-      .then(res => res.data)
-      .catch(error => {
-        console.error('Subscription check API failed:', error);
-        // Return default free tier on any error
-        return {
-          tier: 'free',
-          is_premium: false,
-          deep_dives_remaining: 0,
-          deep_dive_reset_date: null
-        };
-      });
-  },
+      };
+    });
+},
   
   upgradeToPro: () => {
     const userId = localStorage.getItem('user_id');

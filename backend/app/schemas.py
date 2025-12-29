@@ -94,8 +94,46 @@ class RegressionDelta(BaseModel):
     )
 
 
+# Add to schemas.py - Extend Version schema
+
+from enum import Enum
+
+class VerdictType(str, Enum):
+    """Possible verdict outcomes"""
+    IMPROVED = "Improved"
+    SAFETY_HARDENING = "Safety Hardening"  # 🔥 NEW
+    NEUTRAL = "Neutral"
+    REGRESSION = "Regression"
+    UNKNOWN = "Unknown"
+
+class TradeoffType(str, Enum):
+    """Types of legitimate tradeoffs"""
+    SAFETY_VS_HELPFULNESS = "Safety_vs_Helpfulness"
+    EFFICIENCY_VS_DETAIL = "Efficiency_vs_Detail"
+    NONE = "None"
+
+class DirectionAnalysis(BaseModel):
+    """Direction of change analysis"""
+    safety_direction: str = Field(
+        default="unknown",
+        description="improved | neutral | degraded"
+    )
+    helpfulness_direction: str = Field(
+        default="unknown",
+        description="improved | neutral | degraded"
+    )
+    specificity_direction: str = Field(
+        default="unknown",
+        description="increased | neutral | decreased"
+    )
+    reasoning: str = Field(
+        default="",
+        description="Explanation for direction assessment"
+    )
+    
 class Version(BaseModel):
     """Version = Immutable snapshot of one analysis run"""
+
     version_id: str = Field(..., description="Unique version identifier")
     case_id: str = Field(..., description="Parent case ID")
     user_id: str = Field(..., description="Owner Firebase UID")
@@ -106,28 +144,25 @@ class Version(BaseModel):
         ..., description="Original /analyze request"
     )
 
-    # Full analysis response (raw)
+    # 🔥 SINGLE SOURCE OF TRUTH
     analysis_response: Dict[str, Any] = Field(
-        ..., description="Complete /analyze response"
+        ..., description="Complete canonical /analyze response"
     )
 
-    # Quick access fields (denormalized)
+    # 🔥 Indexed / list-view fields ONLY
     cookedness_score: int = Field(default=0)
     verdict: str = Field(default="Unknown")
     deterministic_score: int = Field(default=0)
     test_case_count: int = Field(default=0)
 
-    # 🔥 NEW — Layer 2C outputs
-    root_causes: List[str] = Field(
-        default_factory=list,
-        description="High-level causes of regression/improvement"
-    )
-    analysis_summary: Optional[AnalysisSummary] = None
-    quality_safety_split: Optional[QualitySafetySplit] = None
-    regression_delta: Optional[RegressionDelta] = None
+    # 🔥 Lightweight extracted fields
+    root_causes: List[str] = Field(default_factory=list)
 
-    # Timestamp
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        exclude_none = True  # 🔥 critical
+
 
 
 # ============================================

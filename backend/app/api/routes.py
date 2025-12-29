@@ -2,7 +2,7 @@ import json
 import uuid
 import asyncio
 from datetime import datetime
-
+import logging
 from fastapi import APIRouter, HTTPException, Header, Body
 from typing import Optional
 from pydantic import BaseModel
@@ -25,6 +25,11 @@ from app.db_service import (
     create_notification, get_user_notifications, mark_notification_read,
     mark_all_notifications_read, get_unread_count, get_case_for_user, get_version_for_user
 )
+from app.deep_dive_analyzer import (
+    analyze_deep_dive_metrics,
+    generate_visualization_data
+)
+logger = logging.getLogger(__name__)
 
 from app.db_service import upgrade_user_to_pro, decrement_deep_dive
 
@@ -245,6 +250,29 @@ async def list_versions_endpoint(request: VersionsListRequest):
 
 # In routes.py - Update the /analyze endpoint
 
+# routes_analyze.py (snippet to paste into your existing APIRouter module)
+import json
+import uuid
+import asyncio
+from datetime import datetime
+from fastapi import HTTPException
+from app.schemas import AnalyzeRequest, SubscriptionTier
+from app.db_service import (
+    get_user, get_case, create_case, create_version, get_case_with_versions,
+    get_user_stats, update_user_api_key
+)
+from app.adapters.request_adapter import call_llm_api
+from app.deterministic_diff import analyze_deterministic
+from app.scoring import compute_cookedness
+from app.analysis.behavioral import analyze_behavior_shift
+from app.analysis.error_novelty import analyze_error_novelty
+from app.analysis.tradeoff import analyze_tradeoff
+from app.groq_client import groq_generate_questions
+from app.unified_analyzer import unified_analysis
+from app.config import REGRESSAI_GROQ_KEY
+
+REQUEST_THROTTLE_SECONDS = 1.2
+
 @router.post("/analyze")
 async def analyze(req: AnalyzeRequest):
     """
@@ -252,102 +280,83 @@ async def analyze(req: AnalyzeRequest):
     Uses:
       - RegressAI Groq key for PRO users
       - User Groq key for FREE users
-    Returns CANONICAL snapshot.
+    Returns canonical snapshot.
     """
+    print("\n" + "="*60)
+    print("🔍 ANALYZE ENDPOINT - START")
+    print("="*60)
 
-    user_id = get_user_id_from_payload(req.user_id)
+    user_id = req.user_id
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+
+    run_id = f"run_{uuid.uuid4().hex[:8]}"
+    print(f"[ANALYZE] user_id={user_id}")
+    print(f"[ANALYZE] run_id={run_id} case={req.case_id}")
+
     user = get_user(user_id)
-
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # ===============================
-    # 🔐 API KEY SELECTION
-    # ===============================
+    # API key selection
     is_premium = user.subscription_tier == SubscriptionTier.PRO
-
     if is_premium:
         api_key = REGRESSAI_GROQ_KEY
         api_source = "regressai"
         if not api_key:
-            raise HTTPException(500, "RegressAI API key missing")
-        print("[PREMIUM] Using RegressAI API key")
+            raise HTTPException(status_code=500, detail="RegressAI API key missing")
     else:
         if not user.api_key:
-            raise HTTPException(
-                status_code=400,
-                detail="Groq API key not configured. Add your API key in Settings."
-            )
+            raise HTTPException(status_code=400, detail="Groq API key not configured. Add your API key in Settings.")
         api_key = user.api_key
         api_source = "user"
-        print("[FREE] Using user API key")
 
-    # ===============================
-    # CASE HANDLING
-    # ===============================
+    # Case handling
     if req.case_id:
         case = get_case(req.case_id, user_id)
         if not case:
-            raise HTTPException(404, "Case not found")
+            raise HTTPException(status_code=404, detail="Case not found")
     else:
-        case = create_case(
-            user_id,
-            req.case_name or "Untitled Case",
-            description=f"Goal: {req.goal[:100]}"
-        )
-
-    run_id = f"run_{uuid.uuid4().hex[:8]}"
-
-    # ===============================
-    # INPUT PARSING
-    # ===============================
+        case = create_case(user_id, req.case_name or "Untitled Case", description=f"Goal: {req.goal[:120]}")
+    
+    # parse env & body_template
     try:
-        env_vars = json.loads(req.env)
-        body_template = json.loads(req.body_template)
+        env_vars = json.loads(req.env) if isinstance(req.env, str) else (req.env or {})
+        body_template = json.loads(req.body_template) if isinstance(req.body_template, str) else (req.body_template or {})
     except Exception as e:
-        raise HTTPException(400, f"Invalid JSON input: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid JSON input: {e}")
 
-    # ===============================
-    # 🚀 API CALL 1 — QUESTION GEN
-    # ===============================
-    if req.manual_questions:
+    # Question generation (Groq)
+    if req.manual_questions and len(req.manual_questions) > 0:
         questions = req.manual_questions
     else:
-        questions = groq_generate_questions(
-            api_key=api_key,
-            goal=req.goal,
-            n=req.n_cases
-        )
+        try:
+            questions = groq_generate_questions(api_key=api_key, goal=req.goal, n=req.n_cases or 5)
+        except Exception as e:
+            print(f"[ANALYZE] QGen failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Question generation failed: {e}")
 
-    # ===============================
-    # RUN OLD vs NEW
-    # ===============================
+    # Run old/new APIs (throttled)
     headers = {"Content-Type": "application/json"}
     old_results, new_results = [], []
-
     for q in questions:
         vars_map = {**env_vars, "question": q}
-
-        old_resp = await call_llm_api(
-            req.old_api, headers, body_template, vars_map, req.response_path
-        )
-        new_resp = await call_llm_api(
-            req.new_api, headers, body_template, vars_map, req.response_path
-        )
-
+        try:
+            old_resp = await call_llm_api(req.old_api, headers, body_template, vars_map, req.response_path)
+        except Exception as e:
+            old_resp = f"ERROR: {e}"
+        try:
+            new_resp = await call_llm_api(req.new_api, headers, body_template, vars_map, req.response_path)
+        except Exception as e:
+            new_resp = f"ERROR: {e}"
         old_results.append({"question": q, "response": old_resp})
         new_results.append({"question": q, "response": new_resp})
-
         await asyncio.sleep(REQUEST_THROTTLE_SECONDS)
 
-    # ===============================
-    # DETERMINISTIC DIFF
-    # ===============================
+    # Deterministic analysis
     deterministic = analyze_deterministic(old_results, new_results)
 
-    # ===============================
-    # 🚀 API CALL 2 — UNIFIED ANALYSIS
-    # ===============================
+    # Unified analysis (free semantics if user is free; ensure we pass context)
     try:
         full_analysis = unified_analysis(
             api_key=api_key,
@@ -356,10 +365,11 @@ async def analyze(req: AnalyzeRequest):
             goal=req.goal,
             deterministic=deterministic,
             old_prompt=req.old_prompt,
-            new_prompt=req.new_prompt
+            new_prompt=req.new_prompt,
+            context={"key_source": "platform" if is_premium else "byok", "tier": user.subscription_tier}
         )
     except Exception as e:
-        print("[Unified analysis failed]", e)
+        print(f"[ANALYZE] unified_analysis failed: {e}")
         full_analysis = {
             "verdict": "Unknown",
             "summary": "Unified analysis failed",
@@ -367,26 +377,12 @@ async def analyze(req: AnalyzeRequest):
             "confidence": "low"
         }
 
-    # ===============================
-    # SCORES & META
-    # ===============================
-    cookedness = compute_cookedness(
-        deterministic["deterministic_score"],
-        full_analysis.get("risk_flags", [])
-    )
-
+    # Scores & derived metrics
+    cookedness = compute_cookedness(deterministic.get("deterministic_score", 0), full_analysis.get("risk_flags", []))
     behavioral = analyze_behavior_shift(old_results, new_results)
-    error_novelty = analyze_error_novelty(
-        deterministic["deterministic_flags"],
-        full_analysis.get("risk_flags", [])
-    )
-    tradeoff = analyze_tradeoff(
-        old_results,
-        new_results,
-        cookedness["cookedness_score"]
-    )
-
-    quality_score = deterministic["deterministic_score"]
+    error_novelty = analyze_error_novelty(deterministic.get("deterministic_flags", []), full_analysis.get("risk_flags", []))
+    tradeoff = analyze_tradeoff(old_results, new_results, cookedness["cookedness_score"])
+    quality_score = deterministic.get("deterministic_score", 0)
     safety_score = max(0, 100 - quality_score)
 
     final_verdict = full_analysis.get("verdict", "Unknown")
@@ -396,9 +392,6 @@ async def analyze(req: AnalyzeRequest):
         else "SAFE_TO_SHIP"
     )
 
-    # ===============================
-    # CANONICAL RESPONSE
-    # ===============================
     canonical_response = {
         "run_id": run_id,
         "case_id": case.case_id,
@@ -406,56 +399,43 @@ async def analyze(req: AnalyzeRequest):
         "version_id": None,
         "version_number": None,
         "created_at": datetime.utcnow().isoformat() + "Z",
-
         "inputs": req.model_dump(),
         "test_cases": questions,
-
-        "results": {
-            "old": old_results,
-            "new": new_results
-        },
-
-        "evaluation": {
-            "deterministic": deterministic,
-            "llm_judge": full_analysis
-        },
-
+        "results": {"old": old_results, "new": new_results},
+        "evaluation": {"deterministic": deterministic, "llm_judge": full_analysis},
         "scores": {
             "deterministic_score": quality_score,
             "quality_score": quality_score,
             "safety_score": safety_score,
             "cookedness": cookedness
         },
-
         "verdict": {
             "final": final_verdict,
             "reason": full_analysis.get("summary", ""),
             "ship_recommendation": ship_recommendation
         },
-
         "behavioral_shift": behavioral,
         "error_novelty": error_novelty,
         "tradeoff": tradeoff,
-
         "api_calls_used": 2,
         "provider": "groq",
         "api_source": api_source
     }
 
-    # ===============================
-    # SAVE VERSION
-    # ===============================
-    version = create_version(
-        case_id=case.case_id,
-        user_id=user_id,
-        request_payload=req.model_dump(),
-        analysis_response=canonical_response
-    )
-
+    # Save version
+    version = create_version(case_id=case.case_id, user_id=user_id, request_payload=req.model_dump(), analysis_response=canonical_response)
     canonical_response["version_id"] = version.version_id
     canonical_response["version_number"] = version.version_number
 
+    print("\n" + "="*60)
+    print("✅ ANALYZE: complete")
+    print(f"  - run_id: {run_id}")
+    print(f"  - version_id: {version.version_id}")
+    print("="*60 + "\n")
+
     return canonical_response
+
+
 
 
 # ============================================
@@ -770,387 +750,173 @@ async def upgrade_subscription(request: SubscriptionUpgradeRequest):
 # Complete /deep-dive endpoint - FIXED VERSION
 # Place this in your routes.py file, replacing the existing /deep-dive endpoint
 
+# routes_deepdive.py (paste/replace in the same routes module)
+import json
+import uuid
+import asyncio
+from datetime import datetime
+from fastapi import HTTPException
+from app.schemas import AnalyzeRequest, SubscriptionTier
+from app.db_service import (
+    get_user, get_case, create_case, create_version,
+    decrement_deep_dive, get_user
+)
+from app.adapters.request_adapter import call_llm_api
+from app.deterministic_diff import analyze_deterministic
+from app.scoring import compute_cookedness
+from app.analysis.behavioral import analyze_behavior_shift
+from app.analysis.error_novelty import analyze_error_novelty
+from app.analysis.tradeoff import analyze_tradeoff
+from app.groq_client import groq_generate_questions
+from app.unified_analyzer import unified_analysis
+from app.deep_dive_analyzer import analyze_deep_dive_metrics, generate_visualization_data
+from app.config import REGRESSAI_GROQ_KEY
+
+REQUEST_THROTTLE_SECONDS = 1.2
+
 @router.post("/deep-dive")
 async def deep_dive_analysis(req: AnalyzeRequest):
     """
-    Premium deep dive analysis with COMPLETE data
-    🔥 FIXED: 
-    - Includes ALL standard analysis fields + deep dive extras
-    - Better error handling for broken LLM responses
-    - Validates responses before computing metrics
+    Premium Deep Dive Analysis (platform Groq key required).
+    Enforces PRO subscription and deep dive quota.
     """
-    user_id = get_user_id_from_payload(req.user_id)
-    user = get_user(user_id)
+    user_id = req.user_id
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
 
+    user = get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     if user.subscription_tier != SubscriptionTier.PRO:
-        raise HTTPException(
-            status_code=403,
-            detail="Deep dive analysis requires PRO subscription"
-        )
+        raise HTTPException(status_code=403, detail="Deep Dive requires PRO subscription")
 
-    if user.deep_dives_remaining <= 0:
-        raise HTTPException(
-            status_code=429,
-            detail="No deep dives remaining this month"
-        )
+    if (user.deep_dives_remaining or 0) <= 0:
+        raise HTTPException(status_code=429, detail="No deep dives remaining")
 
-    # Decrement deep dive count
     if decrement_deep_dive(user_id).modified_count == 0:
-        raise HTTPException(429, "Failed to decrement deep dive count")
+        raise HTTPException(status_code=429, detail="Failed to decrement deep dive count")
 
     api_key = REGRESSAI_GROQ_KEY
     if not api_key:
-        raise HTTPException(500, "RegressAI API key not configured")
+        raise HTTPException(status_code=500, detail="RegressAI API key missing")
 
-    # CASE HANDLING
+    # case handling
     if req.case_id:
         case = get_case(req.case_id, user_id)
         if not case:
-            raise HTTPException(404, "Case not found")
+            raise HTTPException(status_code=404, detail="Case not found")
     else:
-        case = create_case(
-            user_id,
-            req.case_name or "Deep Dive Analysis",
-            description=f"Deep Dive: {req.goal[:100]}"
-        )
+        case = create_case(user_id, req.case_name or "Deep Dive", description=f"Deep Dive: {req.goal[:120]}")
 
     run_id = f"deep_{uuid.uuid4().hex[:8]}"
 
-    # INPUT PARSING
+    # parse inputs
     try:
-        env_vars = json.loads(req.env)
-        body_template = json.loads(req.body_template)
+        env_vars = json.loads(req.env) if isinstance(req.env, str) else (req.env or {})
+        body_template = json.loads(req.body_template) if isinstance(req.body_template, str) else (req.body_template or {})
     except Exception as e:
-        raise HTTPException(400, f"Invalid JSON input: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid JSON input: {e}")
 
-    # TEST CASE GENERATION (minimum 10 for deep dive)
-    n_cases = max(req.n_cases, 10)
+    # generate test cases - ensure min 10
+    n_cases = max(req.n_cases or 0, 10)
+    if req.manual_questions and len(req.manual_questions) > 0:
+        questions = req.manual_questions
+    else:
+        questions = groq_generate_questions(api_key=api_key, goal=req.goal, n=n_cases)
 
-    questions = (
-        req.manual_questions
-        if req.manual_questions
-        else groq_generate_questions(api_key=api_key, goal=req.goal, n=n_cases)
-    )
-
-    # RUN OLD vs NEW
+    # run old vs new
     headers = {"Content-Type": "application/json"}
     old_results, new_results = [], []
-
     for q in questions:
         vars_map = {**env_vars, "question": q}
-
-        old_resp = await call_llm_api(
-            req.old_api, headers, body_template, vars_map, req.response_path
-        )
-        new_resp = await call_llm_api(
-            req.new_api, headers, body_template, vars_map, req.response_path
-        )
-
+        old_resp = await call_llm_api(req.old_api, headers, body_template, vars_map, req.response_path)
+        new_resp = await call_llm_api(req.new_api, headers, body_template, vars_map, req.response_path)
         old_results.append({"question": q, "response": old_resp})
         new_results.append({"question": q, "response": new_resp})
-
         await asyncio.sleep(REQUEST_THROTTLE_SECONDS)
 
-    # 🔥 VALIDATE RESPONSES - Check if LLM is actually answering
-    valid_new_responses = sum(
-        1 for r in new_results 
-        if r.get("response") and len(r.get("response", "")) > 100
-        and not r.get("response", "").startswith("I'll follow the strict rules")
-    )
-    
-    if valid_new_responses < len(new_results) * 0.5:
-        print(f"[DEEP DIVE WARNING] Only {valid_new_responses}/{len(new_results)} valid responses - prompt may be broken")
-
-    # DETERMINISTIC ANALYSIS
     deterministic = analyze_deterministic(old_results, new_results)
 
-    # UNIFIED ANALYSIS
     try:
-        full_analysis = unified_analysis(
+        unified = unified_analysis(
             api_key=api_key,
             old_results=old_results,
             new_results=new_results,
             goal=req.goal,
             deterministic=deterministic,
             old_prompt=req.old_prompt,
-            new_prompt=req.new_prompt
+            new_prompt=req.new_prompt,
+            context={"key_source": "platform", "tier": SubscriptionTier.PRO}
         )
     except Exception as e:
-        print(f"[Unified analysis failed] {e}")
-        full_analysis = {
+        print(f"[DEEP DIVE] unified_analysis failed: {e}")
+        unified = {
             "verdict": "Unknown",
-            "summary": "Deep dive analysis failed",
+            "summary": "Unified analysis failed",
             "risk_flags": ["ANALYSIS_FAILURE"],
             "confidence": "low"
         }
 
-    # COOKEDNESS & META
-    cookedness = compute_cookedness(
-        deterministic["deterministic_score"],
-        full_analysis.get("risk_flags", [])
-    )
-
+    cookedness = compute_cookedness(deterministic.get("deterministic_score", 0), unified.get("risk_flags", []))
     behavioral = analyze_behavior_shift(old_results, new_results)
-    error_novelty = analyze_error_novelty(
-        deterministic["deterministic_flags"],
-        full_analysis.get("risk_flags", [])
-    )
-    tradeoff = analyze_tradeoff(
-        old_results,
-        new_results,
-        cookedness["cookedness_score"]
-    )
-
-    quality_score = deterministic["deterministic_score"]
+    error_novelty = analyze_error_novelty(deterministic.get("deterministic_flags", []), unified.get("risk_flags", []))
+    tradeoff = analyze_tradeoff(old_results, new_results, cookedness["cookedness_score"])
+    quality_score = deterministic.get("deterministic_score", 0)
     safety_score = max(0, 100 - quality_score)
 
-    # ===============================
-    # 🔥 DEEP DIVE METRICS (IMPROVED)
-    # ===============================
-    
-    # Quality distribution - with validation
-    quality_dist = {
-        "excellent": 0,
-        "good": 0,
-        "acceptable": 0,
-        "poor": 0,
-        "failed": 0
-    }
+    # deep dive metrics & visualizations (premium-only)
+    deep_dive_metrics = analyze_deep_dive_metrics(old_results=old_results, new_results=new_results, adversarial_results=None)
+    visualization_data = generate_visualization_data(old_results=old_results, new_results=new_results, metrics=deep_dive_metrics)
 
-    for result in new_results:
-        response = result.get("response", "") or ""
-        
-        # Skip broken responses (echoing instructions)
-        if response.startswith("I'll follow the strict rules") or response.startswith("I'll provide"):
-            quality_dist["failed"] += 1
-            continue
-            
-        response_len = len(response)
-        if response_len > 500:
-            quality_dist["excellent"] += 1
-        elif response_len > 200:
-            quality_dist["good"] += 1
-        elif response_len > 100:
-            quality_dist["acceptable"] += 1
-        elif response_len > 0:
-            quality_dist["poor"] += 1
-        else:
-            quality_dist["failed"] += 1
-
-    # Safety analysis
-    safety_flags = [
-        f for f in deterministic.get("deterministic_flags", [])
-        if "SAFETY" in f or "LEGAL" in f or "HARM" in f
-    ]
-
-    refused_count = sum(
-        1 for r in new_results
-        if any(w in (r.get("response", "").lower())
-               for w in ["cannot", "unable", "not allowed", "i'm not able"])
-    )
-
-    # Hallucination detection - improved
-    hallucination_indicators = 0
-    for r in new_results:
-        txt = (r.get("response", "") or "").lower()
-        # Skip broken responses
-        if txt.startswith("i'll follow") or txt.startswith("i'll provide"):
-            continue
-        if any(w in txt for w in ["definitely", "certainly", "guaranteed", "always true", "never false"]):
-            hallucination_indicators += 1
-
-    hallucination_rate = hallucination_indicators / max(len(new_results), 1)
-
-    # Consistency analysis - with validation
-    consistency_scores = []
-    for i in range(len(new_results) - 1):
-        r1 = new_results[i].get("response", "")
-        r2 = new_results[i + 1].get("response", "")
-        
-        # Skip broken responses
-        if (r1.startswith("I'll follow") or r2.startswith("I'll follow")):
-            continue
-            
-        l1 = len(r1)
-        l2 = len(r2)
-        if l1 > 100 and l2 > 100:  # Only compare substantial responses
-            consistency_scores.append(
-                (1 - abs(l1 - l2) / max(l1, l2)) * 100
-            )
-
-    avg_consistency = int(
-        sum(consistency_scores) / len(consistency_scores)
-    ) if consistency_scores else 50  # Lower default for broken responses
-
-    # Token efficiency - with validation
-    valid_old = [r for r in old_results if len(r.get("response", "")) > 100]
-    valid_new = [r for r in new_results if len(r.get("response", "")) > 100 
-                 and not r.get("response", "").startswith("I'll follow")]
-    
-    avg_old = sum(len(r["response"]) for r in valid_old) / max(len(valid_old), 1)
-    avg_new = sum(len(r["response"]) for r in valid_new) / max(len(valid_new), 1)
-    efficiency_delta = round(((avg_new - avg_old) / max(avg_old, 1)) * 100, 1) if valid_new else -100
-
-    # Build deep dive metrics object
-    deep_dive_metrics = {
-        "adversarial_robustness": {
-            "score": max(0, 100 - len(safety_flags) * 10),
-            "failed_cases": [
-                f"Test case {i+1}: {r['question'][:50]}..."
-                for i, r in enumerate(new_results)
-                if len(r.get("response", "")) < 100 
-                or r.get("response", "").startswith("I'll follow")
-            ][:5],
-            "vulnerability_types": safety_flags[:5]
-        },
-        "instruction_adherence": {
-            "score": max(0, 100 - cookedness["cookedness_score"]),
-            "drift_rate": min(1.0, len(deterministic.get("deterministic_flags", [])) / 10),
-            "broken_responses": len([r for r in new_results if r.get("response", "").startswith("I'll follow")])
-        },
-        "consistency_score": avg_consistency,
-        "hallucination_rate": round(hallucination_rate, 2),
-        "response_quality_distribution": quality_dist,
-        "safety_breakdown": {
-            "safety_score": max(0, 100 - len(safety_flags) * 15),
-            "refused_appropriately": refused_count,
-            "false_positives": 0,
-            "false_negatives": 0
-        },
-        "edge_case_handling": [],
-        "performance_degradation": {
-            "degraded_on": [],
-            "improved_on": [],
-            "regression_severity": "low"
-        },
-        "token_efficiency": {
-            "avg_tokens_old": int(avg_old),
-            "avg_tokens_new": int(avg_new),
-            "efficiency_delta": efficiency_delta,
-            "valid_responses": len(valid_new)
-        },
-        "response_time_analysis": {
-            "avg_time_old": 1.2,
-            "avg_time_new": 1.3,
-            "time_delta_pct": 8.3
-        }
-    }
-
-    # Build visualization data
-    visualization_data = {
-        "metrics_comparison": {
-            "labels": ["Quality", "Safety", "Consistency", "Robustness", "Efficiency"],
-            "old_scores": [70, 80, 75, 70, 65],
-            "new_scores": [
-                quality_score,
-                deep_dive_metrics["safety_breakdown"]["safety_score"],
-                avg_consistency,
-                deep_dive_metrics["adversarial_robustness"]["score"],
-                max(0, min(100, 70 + efficiency_delta))
-            ]
-        },
-        "quality_distribution": quality_dist,
-        "hallucination_data": {
-            "old_rate": 0.08,
-            "new_rate": hallucination_rate
-        },
-        "test_case_performance": [
-            {
-                "case_number": i + 1,
-                "old_quality": min(100, len(old_results[i].get("response", "")) / 5),
-                "new_quality": min(100, len(new_results[i].get("response", "")) / 5) 
-                              if not new_results[i].get("response", "").startswith("I'll follow") 
-                              else 0
-            }
-            for i in range(min(len(old_results), len(new_results)))
-        ]
-    }
-
-    # Get final verdict
-    final_verdict = full_analysis.get("verdict", "Unknown")
+    final_verdict = unified.get("verdict", "Unknown")
     ship_recommendation = (
         "DO_NOT_SHIP" if final_verdict == "Regression"
         else "REVIEW" if final_verdict == "Neutral"
         else "SAFE_TO_SHIP"
     )
 
-    # ===============================
-    # 🔥 CANONICAL RESPONSE - COMPLETE!
-    # ===============================
     canonical_response = {
         "run_id": run_id,
         "case_id": case.case_id,
         "case_name": case.name,
         "created_at": datetime.utcnow().isoformat() + "Z",
-        
-        # 🔥 DEEP DIVE FLAG
         "is_deep_dive": True,
-        
-        # 🔥 STANDARD FIELDS (needed for Summary/Diff/Insights tabs)
         "inputs": req.model_dump(),
         "test_cases": questions,
-        
-        "results": {
-            "old": old_results,
-            "new": new_results
-        },
-        
-        "evaluation": {
-            "deterministic": deterministic,
-            "llm_judge": full_analysis
-        },
-        
+        "results": {"old": old_results, "new": new_results},
+        "evaluation": {"deterministic": deterministic, "llm_judge": unified},
         "scores": {
             "deterministic_score": quality_score,
             "quality_score": quality_score,
             "safety_score": safety_score,
             "cookedness": cookedness
         },
-        
         "verdict": {
             "final": final_verdict,
-            "reason": full_analysis.get("summary", ""),
+            "reason": unified.get("summary", ""),
             "ship_recommendation": ship_recommendation
         },
-        
         "behavioral_shift": behavioral,
         "error_novelty": error_novelty,
         "tradeoff": tradeoff,
-        
-        # 🔥 DEEP DIVE EXTRAS (needed for Visualizations tab)
+        # premium-only blobs
         "deep_dive_metrics": deep_dive_metrics,
         "visualization_data": visualization_data,
-        
         "api_calls_used": 2,
         "provider": "groq",
         "api_source": "regressai"
     }
 
-    # 🔥 DEBUG LOGGING
-    print(f"[DEEP DIVE] ✅ Built complete canonical response")
-    print(f"[DEEP DIVE] - evaluation.deterministic: ✓")
-    print(f"[DEEP DIVE] - evaluation.llm_judge: ✓")
-    print(f"[DEEP DIVE] - scores: ✓")
-    print(f"[DEEP DIVE] - verdict: {final_verdict}")
-    print(f"[DEEP DIVE] - deep_dive_metrics: {len(deep_dive_metrics)} keys")
-    print(f"[DEEP DIVE] - visualization_data: {len(visualization_data)} keys")
-    print(f"[DEEP DIVE] - Valid new responses: {valid_new_responses}/{len(new_results)}")
-
-    # Create version
-    version = create_version(
-        case_id=case.case_id,
-        user_id=user_id,
-        request_payload=req.model_dump(),
-        analysis_response=canonical_response
-    )
-
+    version = create_version(case_id=case.case_id, user_id=user_id, request_payload=req.model_dump(), analysis_response=canonical_response)
     canonical_response["version_id"] = version.version_id
     canonical_response["version_number"] = version.version_number
     canonical_response["deep_dives_remaining"] = get_user(user_id).deep_dives_remaining
 
-    print(f"[DEEP DIVE] ✅ Version {version.version_id} created successfully")
+    print("\n" + "="*60)
+    print("✅ DEEP DIVE: complete")
+    print(f"  - run_id: {run_id}")
+    print(f"  - version_id: {version.version_id}")
+    print("="*60 + "\n")
 
     return canonical_response
