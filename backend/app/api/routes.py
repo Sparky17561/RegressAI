@@ -739,38 +739,7 @@ async def upgrade_subscription(request: SubscriptionUpgradeRequest):
     else:
         raise HTTPException(status_code=500, detail="Upgrade failed")
 
-# ============================================
-# DEEP DIVE ENDPOINT (PREMIUM ONLY)
-# ============================================
 
-# In routes.py - Update the /deep-dive endpoint to mark versions properly
-
-# In routes.py - Replace the ENTIRE /deep-dive endpoint with this:
-
-# Complete /deep-dive endpoint - FIXED VERSION
-# Place this in your routes.py file, replacing the existing /deep-dive endpoint
-
-# routes_deepdive.py (paste/replace in the same routes module)
-import json
-import uuid
-import asyncio
-from datetime import datetime
-from fastapi import HTTPException
-from app.schemas import AnalyzeRequest, SubscriptionTier
-from app.db_service import (
-    get_user, get_case, create_case, create_version,
-    decrement_deep_dive, get_user
-)
-from app.adapters.request_adapter import call_llm_api
-from app.deterministic_diff import analyze_deterministic
-from app.scoring import compute_cookedness
-from app.analysis.behavioral import analyze_behavior_shift
-from app.analysis.error_novelty import analyze_error_novelty
-from app.analysis.tradeoff import analyze_tradeoff
-from app.groq_client import groq_generate_questions
-from app.unified_analyzer import unified_analysis
-from app.deep_dive_analyzer import analyze_deep_dive_metrics, generate_visualization_data
-from app.config import REGRESSAI_GROQ_KEY
 
 REQUEST_THROTTLE_SECONDS = 1.2
 
