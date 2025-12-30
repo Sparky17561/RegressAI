@@ -48,6 +48,8 @@ graph LR
     G -->|Suggested Fix| A
 
 ```
+<img width="1324" height="655" alt="image" src="https://github.com/user-attachments/assets/fcab181a-5be8-4dcf-bff6-f8d164bb3f71" />
+<img width="1144" height="621" alt="image" src="https://github.com/user-attachments/assets/d89ebb12-ae5a-49ad-85af-ff56e200a67d" />
 
 ---
 
