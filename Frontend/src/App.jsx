@@ -1,7 +1,7 @@
 // App.jsx - FIXED VERSION
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Landing from './pages/Landing';
+import Landing1 from './pages/Landing1';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import { AuthProvider } from './contexts/AuthContext';
@@ -36,7 +36,7 @@ function App() {
       <PremiumProvider>
         <Router>
           <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<Landing1 />} />
             <Route path="/login" element={<Login />} />
             <Route path="/app/*" element={<Dashboard />} />
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -4,20 +4,18 @@
 @import url("https://fonts.googleapis.com/css2?family=BBH+Hegarty&family=Carrois+Gothic&family=Fira+Sans+Extra+Condensed:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Lora:ital,wght@0,400..700;1,400..700&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 
 :root {
-  /* SHARED THEME VARIABLES matches Landing1.css */
-  --color-background: oklch(96% 0.01 251.718); /* Slightly darker */
+  /* LIGHT THEME (Default) */
+  --color-background: oklch(98.9% 0.013 251.718);
   --color-maintext: hsl(0 0% 5%);
   --color-subtext: hsl(0 0% 30%);
   --color-bg-dark: hsl(0 0% 80%);
   --color-bg: hsl(0 0% 90%);
   --color-bg-light: hsl(0 0% 100%);
-  --border: hsl(0 0% 80%); /* Adjusted for visibility */
+  --border: hsl(0 0% 80%); /* Darker gray for light mode visibility */
   --highlight: hsl(0 0% 100%);
-  
-  --color-accent-blue: rgba(59, 130, 246, 0.05);
-  --color-accent-purple: rgba(168, 85, 247, 0.05);
 
-  --shadow: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --border-card: solid 1px var(--border);
+  --shadow: 0px 2px 2px hsla(0, 0%, 0%, 0.07), 0px 4px 4px hsla(0, 0%, 0%, 0.15);
 
   --font-bbh: "BBH Hegarty", sans-serif;
   --font-lora: "Lora", serif;
@@ -26,23 +24,27 @@
 }
 
 [data-theme="dark"] {
-   --color-background: oklch(10.103% 0.02288 271.667);
+  --color-background: oklch(10.103% 0.02288 271.667);
   --color-maintext: hsl(0 0% 95%);
   --color-subtext: hsl(0 0% 70%);
   --color-bg-dark: hsl(0 0% 0%);
   --color-bg: hsl(0 0% 5%);
   --color-bg-light: hsl(0 0% 10%);
-  --border: hsl(0 0% 45%);
+  --border: hsl(0 0% 45%); /* Lighter border for dark mode (white lines effect) */
   --highlight: hsl(0 0% 60%);
+
+  --border-card: solid 1px var(--border);
 }
 
-.login-page-wrapper {
+.landing1-page-container {
   background-color: var(--color-background);
   color: var(--color-maintext);
   font-family: var(--font-lora);
+  min-height: 100vh;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
+/* Custom classes for font switching without @apply */
 .font-bbh { font-family: var(--font-bbh); }
 .font-lora { font-family: var(--font-lora); }
 .font-gothic { font-family: var(--font-gothic); }
