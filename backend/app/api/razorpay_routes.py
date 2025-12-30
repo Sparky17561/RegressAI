@@ -104,7 +104,7 @@ def verify_payment(req: VerifyPaymentRequest):
         {"$set": {
             "subscription_tier": "pro",
             "is_premium": True,
-            "deep_dives_remaining": 5
+            "deep_dives_remaining": 20
         }},
         upsert=True
     )
@@ -112,5 +112,5 @@ def verify_payment(req: VerifyPaymentRequest):
     return {
         "success": True,
         "subscription_tier": "pro",
-        "deep_dives_remaining": 5
+        "deep_dives_remaining": 20
     }
