@@ -808,7 +808,7 @@ def upgrade_user_to_pro(user_id: str):
         {"user_id": user_id},
         {"$set": {
             "subscription_tier": "pro",  # ✅ Store as lowercase string
-            "deep_dives_remaining": 5,
+            "deep_dives_remaining": 20,
             "deep_dive_reset_date": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }}
