@@ -15,7 +15,10 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 # 5. Copy the rest of the backend code
 COPY . .
 
-# 6. Command to run the application
+# 6. Expose the port the app runs on
+EXPOSE 8000
+
+# 7. Command to run the application
 # Render provides the PORT environment variable automatically.
 # We use ${PORT:-8000} to default to 8000 if PORT isn't set (useful for local testing).
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
