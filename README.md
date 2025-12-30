@@ -132,7 +132,7 @@ The app will live at **http://localhost:5173** and communicate with the backend 
 ### **Unified Analysis Dashboard**
 
 *(Visualize your regression tests, confidence scores, and root causes)*
-<img alt="Dashboard" src="[https://via.placeholder.com/800x400?text=Analysis+Dashboard+Preview](https://www.google.com/search?q=https://via.placeholder.com/800x400%3Ftext%3DAnalysis%2BDashboard%2BPreview)" />
+<img width="1600" height="866" alt="image" src="https://github.com/user-attachments/assets/516fa7fe-2569-4684-be95-57472013d7cb" />
 
 </div>
 
