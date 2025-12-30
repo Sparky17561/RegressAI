@@ -21,3 +21,4 @@ groq
 google-generativeai
 python-dotenv
 razorpay
+email-validator==2.1.1
