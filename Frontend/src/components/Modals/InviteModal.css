@@ -1,9 +1,36 @@
 .modal-content {
   max-width: 500px;
+  overflow: hidden;
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--border);
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: var(--surface);
+}
+
+.modal-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-icon-bg {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
 }
 
 .modal-header h3 {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -13,12 +40,10 @@
 form {
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
 .modal-body {
   padding: 24px;
-  flex: 1;
 }
 
 .input-group {
@@ -30,47 +55,46 @@ form {
 }
 
 .input-group label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.input-group input[type="email"] {
+.label-icon {
+  color: var(--primary);
+}
+
+.input-premium {
   width: 100%;
   padding: 12px 16px;
-  background: var(--surface);
+  background: var(--surface-alt);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-primary);
   transition: all 0.2s ease;
 }
 
-.input-group input[type="email"]:focus {
+.input-premium:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-}
-
-.input-group input[type="email"]:disabled {
-  background: var(--surface-alt);
-  color: var(--text-muted);
-  cursor: not-allowed;
+  background: var(--surface);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
 }
 
 .input-hint {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 8px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
 /* Role Selector */
-.role-selector {
-  margin-top: 8px;
-}
-
 .role-options {
   display: flex;
   flex-direction: column;
@@ -80,6 +104,7 @@ form {
 .role-option {
   display: block;
   cursor: pointer;
+  position: relative;
 }
 
 .role-option input[type="radio"] {
@@ -89,49 +114,54 @@ form {
 .role-content {
   padding: 16px;
   background: var(--surface);
-  border: 2px solid var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   transition: all 0.2s ease;
 }
 
-.role-option input[type="radio"]:checked + .role-content {
-  border-color: var(--primary);
-  background: rgba(16, 185, 129, 0.05);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+.role-option:hover .role-content {
+  background: var(--surface-alt);
+  border-color: var(--text-muted);
 }
 
-.role-option input[type="radio"]:disabled + .role-content {
-  opacity: 0.5;
-  cursor: not-allowed;
+.role-option input[type="radio"]:checked + .role-content {
+  border-color: var(--primary);
+  background: rgba(16, 185, 129, 0.03);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .role-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .role-icon {
-  font-size: 20px;
-  width: 40px;
-  height: 40px;
-  background: var(--surface-alt);
-  border-radius: var(--radius-md);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .role-option input[type="radio"]:checked + .role-content .role-icon {
-  background: rgba(16, 185, 129, 0.1);
+  color: var(--primary);
 }
 
 .role-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
+  flex: 1;
+}
+
+.role-check {
+  color: var(--primary);
+  animation: scaleIn 0.2s ease;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
 }
 
 .role-description {
@@ -139,15 +169,33 @@ form {
   color: var(--text-secondary);
   line-height: 1.5;
   margin: 0;
-  padding-left: 52px;
+  padding-left: 30px; /* Align with text */
 }
 
 /* Modal Footer */
 .modal-footer {
   padding: 24px;
+  background: var(--surface-alt);
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  flex-shrink: 0;
+}
+
+.btn-text {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  font-weight: 500;
+}
+
+.btn-text:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--text-primary);
+}
+
+.btn-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

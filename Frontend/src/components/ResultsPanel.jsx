@@ -1,4 +1,25 @@
 import { useState, useEffect, useMemo } from 'react';
+import { 
+  BarChart2, 
+  AlertTriangle, 
+  CheckCircle, 
+  Info, 
+  Camera, 
+  Zap, 
+  TrendingUp, 
+  Activity,
+  Shield,
+  FileText,
+  AlertCircle,
+  HelpCircle,
+  Target as TargetIcon, // Renamed to avoid conflict if 'Target' is used elsewhere
+  Lightbulb,
+  UserPlus,
+  Users,
+  CheckSquare,
+  Code,
+  List
+} from 'lucide-react';
 import Visualizations from './Visualizations';
 import './ResultsPanel.css';
 
@@ -7,7 +28,8 @@ const ResultsPanel = ({
   comments,
   teamMembers,
   onAddComment,
-  isPremium
+  isPremium,
+  onInvite
 }) => {
   const [activeTab, setActiveTab] = useState('summary');
   const [newComment, setNewComment] = useState('');
@@ -48,14 +70,14 @@ const ResultsPanel = ({
     
     // Map to display values
     if (shipDecision.includes('Safe to ship') || shipDecision.includes('SAFE_TO_SHIP')) {
-      return { decision: 'Safe to ship', color: 'safe', label: 'APPROVED' };
+      return { decision: 'Safe to ship', color: 'safe', label: 'APPROVED', icon: CheckCircle };
     } else if (shipDecision.includes('Ship with monitoring') || shipDecision.includes('SHIP_WITH_MONITORING')) {
-      return { decision: 'Ship with monitoring', color: 'warning', label: 'CONDITIONAL' };
+      return { decision: 'Ship with monitoring', color: 'warning', label: 'CONDITIONAL', icon: AlertTriangle };
     } else if (shipDecision.includes('Do not ship') || shipDecision.includes('DO_NOT_SHIP')) {
-      return { decision: 'Do not ship', color: 'danger', label: 'BLOCKED' };
+      return { decision: 'Do not ship', color: 'danger', label: 'BLOCKED', icon: AlertCircle };
     }
     
-    return { decision: shipDecision, color: 'neutral', label: shipDecision };
+    return { decision: shipDecision, color: 'neutral', label: shipDecision, icon: Info };
   };
 
   // Get tradeoff display with corrected safety logic
@@ -159,18 +181,18 @@ const ResultsPanel = ({
 
   const tabs = useMemo(() => {
     const baseTabs = [
-      { id: 'summary', label: '📊 Summary', premium: false },
-      { id: 'diff', label: '🔍 Diff', premium: false },
-      { id: 'insights', label: '💡 Insights', premium: false },
-      { id: 'metrics', label: '📈 Metrics', premium: false }
+      { id: 'summary', label: 'Summary', icon: BarChart2, premium: false },
+      { id: 'diff', label: 'Diff', icon: FileText, premium: false },
+      { id: 'insights', label: 'Insights', icon:  Zap, premium: false },
+      { id: 'metrics', label: 'Metrics', icon: Activity, premium: false }
     ];
 
     // Only show Visualizations tab if both premium and deep dive
     if (isDeepDive && isPremium) {
-      baseTabs.push({ id: 'visualizations', label: '📊 Visualizations', premium: true });
+      baseTabs.push({ id: 'visualizations', label: 'Visualizations', icon: TrendingUp, premium: true });
     }
 
-    baseTabs.push({ id: 'snapshot', label: '📸 Snapshot', premium: false });
+    baseTabs.push({ id: 'snapshot', label: 'Snapshot', icon: Camera, premium: false });
 
     return baseTabs;
   }, [selectedVersion, isDeepDive, isPremium]);
@@ -276,7 +298,7 @@ const ResultsPanel = ({
     if (!selectedVersion) {
       return (
         <div className="empty-state">
-          <div className="empty-icon">📈</div>
+          <div className="empty-icon"><BarChart2 size={48} /></div>
           <h3>No Metrics Available</h3>
           <p>Run an analysis to see detailed metrics</p>
         </div>
@@ -341,7 +363,10 @@ const ResultsPanel = ({
         <div className="metrics-header">
           <h3>Comprehensive Analysis Metrics</h3>
           {hasDeepDiveMetrics && (
-            <span className="badge premium">🔬 Deep Dive Analysis</span>
+            <span className="badge premium">
+              <Zap size={14} className="mr-1 inline" />
+              Deep Dive Analysis
+            </span>
           )}
         </div>
 
@@ -349,9 +374,9 @@ const ResultsPanel = ({
         <div className="section-card">
           <div className="section-header">
             <h4>
-              <span>🔥 Deployment Risk Level</span>
+              <span><Shield size={18} className="text-secondary" /> Deployment Risk Level</span>
               <MetricTooltip text="Overall risk assessment based on safety, quality, and structural changes">
-                <span className="help-icon">❓</span>
+                <HelpCircle size={14} className="help-icon" />
               </MetricTooltip>
             </h4>
           </div>
@@ -404,7 +429,7 @@ const ResultsPanel = ({
                   </div>
                   <div className="driver-description">
                     {safetyScore >= 70 ? 'High safety' : 
-                     safetyScore >= 40 ? 'Moderate safety' : 
+                     safetyScore >= 40 ? 'Moderately safe' : 
                      'Low safety — deployment blocker'}
                   </div>
                 </div>
@@ -417,9 +442,9 @@ const ResultsPanel = ({
         <div className="section-card">
           <div className="section-header">
             <h4>
-              <span>⚙️ Structural Change Analysis</span>
+              <span><Activity size={18} className="text-secondary" /> Structural Change Analysis</span>
               <MetricTooltip text="Measures output similarity. High score = low change, not high quality.">
-                <span className="help-icon">❓</span>
+                <HelpCircle size={14} className="help-icon" />
               </MetricTooltip>
             </h4>
           </div>
@@ -454,13 +479,14 @@ const ResultsPanel = ({
               <h5>
                 <span>Structural Issues Detected</span>
                 <MetricTooltip text="Concrete failures detected across test cases">
-                  <span className="help-icon small">❓</span>
+                  <HelpCircle size={14} className="help-icon small" />
                 </MetricTooltip>
               </h5>
               <div className="tags-grid">
                 {deterministic.deterministic_flags.map((flag, index) => (
                   <MetricTooltip key={index} text={`${flag}: ${getFlagDescription(flag)}`}>
                     <span className="tag flag-tag">
+                      <AlertCircle size={12} className="mr-1 inline" />
                       {flag}
                     </span>
                   </MetricTooltip>
@@ -474,16 +500,16 @@ const ResultsPanel = ({
         <div className="section-card">
           <div className="section-header">
             <h4>
-              <span>📊 Quality & Safety Scores</span>
+              <span><BarChart2 size={18} className="text-secondary" /> Quality & Safety Scores</span>
               <MetricTooltip text="Quality measures helpfulness, Safety measures caution. Safety score dominates deployment decisions.">
-                <span className="help-icon">❓</span>
+                <HelpCircle size={14} className="help-icon" />
               </MetricTooltip>
             </h4>
           </div>
           
           {safetyScore < 30 && (
             <div className="safety-warning-banner">
-              <div className="warning-icon">🚨</div>
+              <div className="warning-icon"><AlertTriangle size={20} /></div>
               <div className="warning-content">
                 <div className="warning-title">Critical Safety Alert</div>
                 <div className="warning-text">
@@ -552,9 +578,9 @@ const ResultsPanel = ({
         <div className="section-card">
           <div className="section-header">
             <h4>
-              <span>⚖️ Change Analysis</span>
+              <span><TrendingUp size={18} className="text-secondary" /> Change Analysis</span>
               <MetricTooltip text="Tradeoffs between different dimensions. Explains why Safety Hardening happens.">
-                <span className="help-icon">❓</span>
+                <HelpCircle size={14} className="help-icon" />
               </MetricTooltip>
             </h4>
           </div>
@@ -603,7 +629,7 @@ const ResultsPanel = ({
           
           {tradeoffDisplay.isSafetyHardening && (
             <div className="tradeoff-explanation">
-              <div className="explanation-icon">🛡️</div>
+              <div className="explanation-icon"><Shield size={16} /></div>
               <div className="explanation-content">
                 <strong>Safety Hardening Detected:</strong> Model became more cautious at the expense of helpfulness.
                 This prioritizes safety over user experience.
@@ -625,9 +651,9 @@ const ResultsPanel = ({
         <div className="section-card">
           <div className="section-header">
             <h4>
-              <span>🔄 Behavioral Shift Analysis</span>
+              <span><Activity size={18} className="text-secondary" /> Behavioral Shift Analysis</span>
               <MetricTooltip text="How did the style and tone of the model change? Important for user experience and trust.">
-                <span className="help-icon">❓</span>
+                <HelpCircle size={14} className="help-icon" />
               </MetricTooltip>
             </h4>
           </div>
@@ -655,16 +681,16 @@ const ResultsPanel = ({
           <div className="section-card">
             <div className="section-header">
               <h4>
-                <span>🔬 Advanced Metrics</span>
-                <MetricTooltip text="Detailed analysis metrics for deep dive insights">
-                  <span className="help-icon">❓</span>
+                <span><Camera size={18} className="text-secondary" /> Advanced Metrics</span>
+                 <MetricTooltip text="Detailed analysis metrics for deep dive insights">
+                  <HelpCircle size={14} className="help-icon" />
                 </MetricTooltip>
               </h4>
             </div>
             
             {isDeploymentBlocked && (
               <div className="advanced-metrics-disclaimer">
-                <div className="disclaimer-icon">ℹ️</div>
+                <div className="disclaimer-icon"><Info size={16} /></div>
                 <div className="disclaimer-content">
                   <strong>Note:</strong> Advanced metrics do NOT override safety or deterministic failures for deployment decisions.
                 </div>
@@ -727,9 +753,9 @@ const ResultsPanel = ({
         <div className="section-card">
           <div className="section-header">
             <h4>
-              <span>⚠️ Error Novelty Analysis</span>
+              <span><AlertTriangle size={18} className="text-secondary" /> Error Novelty Analysis</span>
               <MetricTooltip text="Teams tolerate old bugs but hate new ones. Tracks what's new vs inherited.">
-                <span className="help-icon">❓</span>
+                <HelpCircle size={14} className="help-icon" />
               </MetricTooltip>
             </h4>
           </div>
@@ -768,15 +794,15 @@ const ResultsPanel = ({
         <div className="section-card">
           <div className="section-header">
             <h4>
-              <span>🎯 User Experience Impact</span>
+              <span><TargetIcon size={18} className="text-secondary" /> User Experience Impact</span>
               <MetricTooltip text="Product-level metrics that PMs and managers care about">
-                <span className="help-icon">❓</span>
+                <HelpCircle size={14} className="help-icon" />
               </MetricTooltip>
             </h4>
           </div>
           
           <div className="kpi-note">
-            <div className="kpi-note-icon">ℹ️</div>
+            <div className="kpi-note-icon"><Info size={16} /></div>
             <div className="kpi-note-content">
               <strong>Note:</strong> User experience metrics indicate impact, not deployment safety. 
               Deployment decisions prioritize safety and deterministic failures.
@@ -1270,7 +1296,7 @@ const ResultsPanel = ({
     if (!selectedVersion) {
       return (
         <div className="empty-state">
-          <div className="empty-icon">💡</div>
+           <div className="empty-icon"><Lightbulb size={48} /></div>
           <h3>No Insights Available</h3>
           <p>Run an analysis to see AI-powered insights</p>
         </div>
@@ -1289,7 +1315,7 @@ const ResultsPanel = ({
     if (!llmJudge || Object.keys(llmJudge).length === 0) {
       return (
         <div className="empty-state">
-          <div className="empty-icon">💡</div>
+          <div className="empty-icon"><Lightbulb size={48} /></div>
           <h3>No Insights Available</h3>
           <p>LLM analysis not available for this version</p>
         </div>
@@ -1299,67 +1325,98 @@ const ResultsPanel = ({
     return (
       <div className="insights-content">
         {hasBrokenResponses && (
-          <div style={{
-            backgroundColor: '#fff3cd',
-            border: '2px solid #ffc107',
-            padding: '1rem',
-            borderRadius: '0.5rem',
-            marginBottom: '1.5rem'
-          }}>
-            <p style={{ color: '#856404', fontWeight: '600', marginBottom: '0.5rem' }}>
-              ⚠️ Analysis Quality Warning
-            </p>
-            <p style={{ color: '#856404', fontSize: '0.9rem', margin: 0 }}>
-              {brokenCount} out of {newResults.length} responses were broken. The insights below 
-              are based on incomplete data and may not be accurate.
-            </p>
+          <div className="insight-warning-banner">
+             <AlertTriangle size={20} className="text-warning" />
+             <div>
+              <strong>Analysis Quality Warning:</strong> {brokenCount} out of {newResults.length} responses were broken. Insights may be incomplete.
+             </div>
           </div>
         )}
 
-        {llmJudge.change_type && (
-          <div className="insight-section">
-            <h4>Change Type: {llmJudge.change_type}</h4>
-            <p className="insight-summary">{llmJudge.summary || llmJudge.change_summary}</p>
-          </div>
-        )}
+        <div className="insights-grid">
+          {/* Change Summary Card */}
+          {llmJudge.change_type && (
+            <div className="insight-card summary-card">
+              <div className="card-header-icon"><Activity size={20} /></div>
+              <div className="card-content">
+                <span className="insight-label">Detected Change Type</span>
+                <h4 className="insight-title">{llmJudge.change_type}</h4>
+                <p className="insight-description">{llmJudge.summary || llmJudge.change_summary}</p>
+              </div>
+            </div>
+          )}
 
-        {llmJudge.findings?.length > 0 && (
-          <div className="insight-section">
-            <h4>Key Findings</h4>
-            <ul className="insight-list">
-              {llmJudge.findings.map((finding, index) => (
-                <li key={index}>{finding}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+           {/* Metrics to Watch */}
+           {llmJudge.metrics_to_watch?.length > 0 && (
+            <div className="insight-card metrics-card">
+               <div className="card-header-small">
+                <TargetIcon size={16} className="mr-2" />
+                <span>Metrics to Watch</span>
+              </div>
+              <div className="metrics-tags">
+                {llmJudge.metrics_to_watch.map((metric, index) => (
+                  <span key={index} className="metric-tag">{metric}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-        {llmJudge.root_causes?.length > 0 && (
-          <div className="insight-section">
-            <h4>Root Causes</h4>
-            <ul className="insight-list">
-              {llmJudge.root_causes.map((cause, index) => (
-                <li key={index}>{cause}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <div className="insights-columns">
+          {/* Findings Component */}
+          {llmJudge.findings?.length > 0 && (
+            <div className="insight-column">
+              <h4 className="column-header">
+                <CheckSquare size={18} /> Key Findings
+              </h4>
+              <ul className="findings-list">
+                {llmJudge.findings.map((finding, index) => (
+                  <li key={index} className="finding-item">
+                    <span className="bullet">•</span>
+                    {finding}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
+          {/* Root Causes Component */}
+          {llmJudge.root_causes?.length > 0 && (
+            <div className="insight-column">
+              <h4 className="column-header">
+                 <List size={18} /> Root Causes
+              </h4>
+              <ul className="findings-list causes-list">
+                {llmJudge.root_causes.map((cause, index) => (
+                  <li key={index} className="finding-item">
+                     <span className="bullet">→</span>
+                    {cause}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Suggestions Grid */}
         {llmJudge.suggestions?.length > 0 && (
-          <div className="insight-section">
-            <h4>Suggestions</h4>
+          <div className="suggestions-section">
+            <h4 className="section-title">
+              <Lightbulb size={20} className="text-primary" /> Strategic Suggestions
+            </h4>
             <div className="suggestions-grid">
               {llmJudge.suggestions.map((suggestion, index) => (
-                <div key={index} className="suggestion-card">
+                <div key={index} className="suggestion-card-premium">
                   <div className="suggestion-header">
-                    <span className="suggestion-scope">{suggestion.scope || 'general'}</span>
-                    <span className={`suggestion-severity semantic-${(suggestion.severity || 'medium').toLowerCase()}`}>
-                      {suggestion.severity || 'medium'}
-                    </span>
+                     <span className={`severity-indicator severity-${(suggestion.severity || 'medium').toLowerCase()}`}></span>
+                    <span className="suggestion-scope">{suggestion.scope || 'General'}</span>
                   </div>
-                  <p className="suggestion-explanation">{suggestion.explanation}</p>
+                  <p className="suggestion-text">{suggestion.explanation}</p>
                   {suggestion.suggested_text && (
-                    <pre className="suggestion-code">{suggestion.suggested_text}</pre>
+                    <div className="code-snippet">
+                      <Code size={14} className="code-icon" />
+                      <pre>{suggestion.suggested_text}</pre>
+                    </div>
                   )}
                 </div>
               ))}
@@ -1367,50 +1424,42 @@ const ResultsPanel = ({
           </div>
         )}
 
+        {/* Revised Prompt */}
         {llmJudge.revised_prompt && (
-          <div className="insight-section">
-            <h4>Revised Prompt</h4>
-            <textarea
-              className="revised-prompt"
-              value={llmJudge.revised_prompt}
-              readOnly
-              rows={10}
-            />
-          </div>
-        )}
-
-        {llmJudge.quick_tests?.length > 0 && (
-          <div className="insight-section">
-            <h4>Quick Tests</h4>
-            <ul className="insight-list">
-              {llmJudge.quick_tests.map((test, index) => (
-                <li key={index}>{test}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {llmJudge.metrics_to_watch?.length > 0 && (
-          <div className="insight-section">
-            <h4>Metrics to Watch</h4>
-            <div className="metrics-grid-small">
-              {llmJudge.metrics_to_watch.map((metric, index) => (
-                <div key={index} className="metric-chip">
-                  {metric}
-                </div>
-              ))}
+          <div className="prompt-section">
+            <h4 className="section-title">
+              <Sparkles size={20} className="text-primary" /> Recommended Prompt Refinement
+            </h4>
+            <div className="prompt-container">
+               <textarea
+                className="revised-prompt-premium"
+                value={llmJudge.revised_prompt}
+                readOnly
+                rows={8}
+              />
+              <div className="prompt-actions">
+                <button 
+                  className="btn-copy"
+                  onClick={() => navigator.clipboard.writeText(llmJudge.revised_prompt)}
+                >
+                  Copy to Clipboard
+                </button>
+              </div>
             </div>
           </div>
         )}
 
+        {/* Risk Flags */}
         {llmJudge.risk_flags?.length > 0 && (
-          <div className="insight-section">
-            <h4>Risk Flags</h4>
-            <div className="flags-grid">
+          <div className="risk-flags-section">
+            <h4 className="section-title text-danger">
+              <AlertTriangle size={20} /> Detected Risk Flags
+            </h4>
+            <div className="flags-grid-premium">
               {llmJudge.risk_flags.map((flag, index) => (
-                <div key={index} className="flag-item">
-                  <span className="flag-icon">⚠️</span>
-                  <span className="flag-text">{flag}</span>
+                <div key={index} className="flag-card">
+                  <span className="flag-icon-large">⚠️</span>
+                  <span className="flag-text-large">{flag}</span>
                 </div>
               ))}
             </div>
@@ -1501,32 +1550,43 @@ const ResultsPanel = ({
       </div>
 
       <div className="team-sidebar">
-        <h4>Team Members</h4>
+        <div className="team-header-row">
+           <h4><Users size={16} className="mr-2" /> Team</h4>
+           <button className="btn-icon-small" onClick={onInvite} title="Invite Member">
+             <UserPlus size={16} />
+           </button>
+        </div>
+        
         <div className="team-list">
           {teamMembers?.length === 0 ? (
             <div className="empty-team">
               <p>No team members</p>
-              <button className="btn btn-secondary btn-sm">
+              <button className="btn btn-secondary btn-sm w-full mt-2" onClick={onInvite}>
                 Invite Members
               </button>
             </div>
           ) : (
-            teamMembers?.map((member) => (
-              <div key={member.member_id} className="team-member">
+            <>
+            {teamMembers?.map((member) => (
+              <div key={member.member_id} className="team-member-card">
                 <div className="member-avatar">
                   {(member.display_name || member.email)?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <div className="member-info">
                   <div className="member-name">
-                    {member.display_name || member.email}
-                    {member.role === 'OWNER' && (
-                      <span className="badge owner">Owner</span>
-                    )}
+                    {member.display_name || member.email.split('@')[0]}
                   </div>
-                  <div className="member-role">{member.role}</div>
+                  <div className="member-role-badge">
+                    {member.role === 'OWNER' ? '👑 OWNER' : '👤 ' + member.role}
+                  </div>
                 </div>
               </div>
-            ))
+            ))}
+             <button className="invite-row-btn" onClick={onInvite}>
+                <div className="invite-icon-circle"><UserPlus size={14} /></div>
+                <span>Invite New Member</span>
+             </button>
+            </>
           )}
         </div>
       </div>

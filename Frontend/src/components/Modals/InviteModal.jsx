@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X, UserPlus, Eye, Edit2, Mail, Shield, Check } from 'lucide-react';
 import './InviteModal.css';
 
 const InviteModal = ({ isOpen, onClose, onSubmit }) => {
@@ -36,16 +37,19 @@ const InviteModal = ({ isOpen, onClose, onSubmit }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Invite Collaborator</h3>
+          <div className="modal-title-wrapper">
+             <div className="modal-icon-bg"><UserPlus size={20} className="text-primary" /></div>
+             <h3>Invite Collaborator</h3>
+          </div>
           <button className="btn-icon close-btn" onClick={onClose}>
-            ✕
+            <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             <div className="input-group">
-              <label htmlFor="inviteEmail">Email Address</label>
+              <label htmlFor="inviteEmail"><Mail size={16} className="label-icon" /> Email Address</label>
               <input
                 id="inviteEmail"
                 type="email"
@@ -54,6 +58,7 @@ const InviteModal = ({ isOpen, onClose, onSubmit }) => {
                 placeholder="collaborator@example.com"
                 disabled={loading}
                 autoFocus
+                className="input-premium"
               />
               <div className="input-hint">
                 Enter the email address of the person you want to invite
@@ -61,7 +66,7 @@ const InviteModal = ({ isOpen, onClose, onSubmit }) => {
             </div>
 
             <div className="input-group">
-              <label htmlFor="inviteRole">Role</label>
+              <label htmlFor="inviteRole"><Shield size={16} className="label-icon" /> Access Level</label>
               <div className="role-selector">
                 <div className="role-options">
                   <label className="role-option">
@@ -75,8 +80,9 @@ const InviteModal = ({ isOpen, onClose, onSubmit }) => {
                     />
                     <div className="role-content">
                       <div className="role-header">
-                        <span className="role-icon">👀</span>
+                        <span className="role-icon"><Eye size={18} /></span>
                         <span className="role-name">Viewer</span>
+                         {role === 'VIEWER' && <Check size={16} className="role-check" />}
                       </div>
                       <p className="role-description">
                         Can view cases and results, but cannot run analyses or make changes
@@ -95,8 +101,9 @@ const InviteModal = ({ isOpen, onClose, onSubmit }) => {
                     />
                     <div className="role-content">
                       <div className="role-header">
-                        <span className="role-icon">✏️</span>
+                        <span className="role-icon"><Edit2 size={18} /></span>
                         <span className="role-name">Editor</span>
+                         {role === 'EDITOR' && <Check size={16} className="role-check" />}
                       </div>
                       <p className="role-description">
                         Can run analyses, add comments, and collaborate on cases
@@ -111,7 +118,7 @@ const InviteModal = ({ isOpen, onClose, onSubmit }) => {
           <div className="modal-footer">
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn btn-text"
               onClick={onClose}
               disabled={loading}
             >
@@ -119,7 +126,7 @@ const InviteModal = ({ isOpen, onClose, onSubmit }) => {
             </button>
             <button
               type="submit"
-              className="btn btn-primary"
+              className="btn btn-primary btn-with-icon"
               disabled={loading || !email.trim()}
             >
               {loading ? (
@@ -128,7 +135,10 @@ const InviteModal = ({ isOpen, onClose, onSubmit }) => {
                   Sending...
                 </>
               ) : (
-                'Send Invite'
+                <>
+                <Mail size={16} />
+                Send Invite
+                </>
               )}
             </button>
           </div>
