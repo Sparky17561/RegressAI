@@ -39,7 +39,7 @@ const Landing1 = () => {
             <div className="container mx-auto px-6 h-16 flex items-center justify-between">
               <div className="flex items-center gap-8">
                 <Link to="/" className="flex items-center gap-2 font-bbh text-xl tracking-tighter">
-                  <div className="w-6 h-6 bg-[var(--color-maintext)] rounded-full" />
+                  <img src="/logo.png" alt="RegressAI" className="w-8 h-8 object-contain" />
                   RegressAI
                 </Link>
                 <div className="hidden md:flex items-center gap-6 text-sm font-gothic text-[var(--color-subtext)]">

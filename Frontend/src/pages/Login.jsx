@@ -36,7 +36,7 @@ const Login = () => {
       <div className="animate-load w-full max-w-md relative z-10">
         <div className="text-center mb-10">
           <Link to="/" className="inline-flex items-center gap-2 font-bbh text-3xl tracking-tighter uppercase mb-2 font-medium">
-            <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-full" />
+            <img src="/logo.png" alt="RegressAI" className="w-10 h-10 object-contain" />
             RegressAI
           </Link>
           <p className="font-lora text-[var(--color-subtext)] italic">

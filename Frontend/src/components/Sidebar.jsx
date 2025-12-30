@@ -98,7 +98,7 @@ const Sidebar = ({
         <div className="sidebar-header">
           <div className="brand">
             <div className="logo-icon-wrapper">
-              <BrainCircuit className="logo-icon" size={24} />
+              <img src="/logo.png" alt="RegressAI" className="w-8 h-8 object-contain" />
             </div>
             <div className="brand-text">
               <h2>RegressAI</h2>
