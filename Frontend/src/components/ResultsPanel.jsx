@@ -311,7 +311,7 @@ const ResultsPanel = ({
     const deterministic = evaluation?.deterministic || {};
     const llmJudge = evaluation?.llm_judge || {};
     const freeMetrics = llmJudge?.free_metrics || {};
-    const deepDiveMetrics = analysisResponse?.deep_dive_metrics || {}; // Fixed variable name
+    const deepDiveMetrics = analysisResponse?.deep_dive_metrics || {};
     const tradeoff = analysisResponse?.tradeoff || {};
     const errorNovelty = analysisResponse?.error_novelty || {};
     const behavioralShift = analysisResponse?.behavioral_shift || {};
@@ -327,9 +327,7 @@ const ResultsPanel = ({
     const cookednessScore = cookedness.cookedness_score || 0;
     const deterministicScore = deterministic?.deterministic_score || 0;
     
-    const qualityRisk = qualityScore <= 30 ? 'HIGH' : qualityScore <= 60 ? 'MEDIUM' : 'LOW';
-    const safetyRisk = safetyScore <= 30 ? 'HIGH' : safetyScore <= 60 ? 'MEDIUM' : 'LOW';
-    
+    // Risk Calculation Logic
     let finalRisk = 'MEDIUM';
     let finalRiskColor = 'warning';
     let riskExplanation = '';
@@ -345,7 +343,7 @@ const ResultsPanel = ({
     } else if (cookednessScore >= 70) {
       finalRisk = 'HIGH';
       finalRiskColor = 'danger';
-      riskExplanation = 'Overall high risk';
+      riskExplanation = 'Overall high risk score';
     } else if (cookednessScore >= 40) {
       finalRisk = 'MEDIUM';
       finalRiskColor = 'warning';
@@ -353,7 +351,7 @@ const ResultsPanel = ({
     } else {
       finalRisk = 'LOW';
       finalRiskColor = 'safe';
-      riskExplanation = 'Low overall risk';
+      riskExplanation = 'Low overall risk factors';
     }
 
     const isDeploymentBlocked = shippingDecision?.decision === 'Do not ship';
@@ -361,440 +359,141 @@ const ResultsPanel = ({
     return (
       <div className="metrics-content">
         <div className="metrics-header">
-          <h3>Comprehensive Analysis Metrics</h3>
+          <h3>
+            Performance & Risk Metrics
+          </h3>
           {hasDeepDiveMetrics && (
             <span className="badge premium">
               <Zap size={14} className="mr-1 inline" />
-              Deep Dive Analysis
+              Deep Dive Active
             </span>
           )}
         </div>
 
-        {/* Risk Level Display - Fixed */}
-        <div className="section-card">
-          <div className="section-header">
-            <h4>
-              <span><Shield size={18} className="text-secondary" /> Deployment Risk Level</span>
-              <MetricTooltip text="Overall risk assessment based on safety, quality, and structural changes">
-                <HelpCircle size={14} className="help-icon" />
-              </MetricTooltip>
-            </h4>
-          </div>
-          
-          <div className="risk-breakdown">
-            <div className="risk-overview">
-              <div className="risk-final">
-                <div className="risk-final-label">Final Risk Assessment</div>
-                <div className={`risk-final-value semantic-${finalRiskColor}`}>
-                  {finalRisk} RISK
-                </div>
-                <div className="risk-final-explanation">{riskExplanation}</div>
+        {/* Risk Meter & Main Drivers */}
+        <div className="summary-grid">
+           <div className="risk-meter-container">
+              <div className={`risk-circle-large semantic-${finalRiskColor}`}>
+                <span className="risk-number">{cookednessScore}</span>
+                <span className="risk-label-small">Risk Score</span>
+              </div>
+              <div className={`risk-text-large semantic-${finalRiskColor}`}>
+                {finalRisk} RISK
+              </div>
+              <p className="risk-desc-premium">{riskExplanation}</p>
+           </div>
+
+           <div className="key-indicators-card">
+              <div className="card-premium-header">
+                <h4><TargetIcon size={18} className="text-primary" /> Key Drivers</h4>
               </div>
               
-              <div className="risk-score">
-                <div className="risk-score-value">{cookednessScore || 0}</div>
-                <div className="risk-score-label">Computed Score</div>
-                <div className="risk-score-note">
-                  {cookednessScore <= 30 ? 'Low risk' : 
-                   cookednessScore <= 60 ? 'Medium risk' : 'High risk'}
+              <div className="indicator-item">
+                <div className="indicator-label">
+                  <Shield size={16} /> Safety Score
                 </div>
+                <div className="indicator-value">{safetyScore}/100</div>
               </div>
-            </div>
-            
-            <div className="risk-drivers">
-              <h5>Risk Drivers</h5>
-              <div className="driver-grid">
-                <div className={`driver-card ${qualityRisk === 'HIGH' ? 'driver-high' : qualityRisk === 'MEDIUM' ? 'driver-medium' : 'driver-low'}`}>
-                  <div className="driver-label">Quality Impact</div>
-                  <div className="driver-status">
-                    <span className={`driver-badge ${qualityRisk === 'HIGH' ? 'badge-danger' : qualityRisk === 'MEDIUM' ? 'badge-warning' : 'badge-safe'}`}>
-                      {qualityRisk}
-                    </span>
-                    <span className="driver-score">({qualityScore}/100)</span>
-                  </div>
-                  <div className="driver-description">
-                    {qualityScore >= 70 ? 'High helpfulness' : 
-                     qualityScore >= 40 ? 'Moderate helpfulness' : 
-                     'Low helpfulness'}
-                  </div>
+              <div className="indicator-item">
+                <div className="indicator-label">
+                  <CheckSquare size={16} /> Quality Score
                 </div>
-                
-                <div className={`driver-card ${safetyRisk === 'HIGH' ? 'driver-high' : safetyRisk === 'MEDIUM' ? 'driver-medium' : 'driver-low'}`}>
-                  <div className="driver-label">Safety Impact</div>
-                  <div className="driver-status">
-                    <span className={`driver-badge ${safetyRisk === 'HIGH' ? 'badge-danger' : safetyRisk === 'MEDIUM' ? 'badge-warning' : 'badge-safe'}`}>
-                      {safetyRisk}
-                    </span>
-                    <span className="driver-score">({safetyScore}/100)</span>
-                  </div>
-                  <div className="driver-description">
-                    {safetyScore >= 70 ? 'High safety' : 
-                     safetyScore >= 40 ? 'Moderately safe' : 
-                     'Low safety — deployment blocker'}
-                  </div>
-                </div>
+                <div className="indicator-value">{qualityScore}/100</div>
               </div>
-            </div>
-          </div>
+              <div className="indicator-item">
+                <div className="indicator-label">
+                  <Code size={16} /> Structure
+                </div>
+                <div className="indicator-value">{deterministicScore}/100</div>
+              </div>
+           </div>
         </div>
 
-        {/* Deterministic Metrics - Fixed */}
+        {/* Quality & Safety Detail Cards */}
+        <div className="stat-cards-grid">
+            <div className="stat-card-premium">
+               <div className="stat-header">
+                 <Shield size={16} /> Safety Analysis
+               </div>
+               <div className="stat-main-value">
+                  {safetyScore}
+                  <span className="text-sm font-normal text-muted">/ 100</span>
+               </div>
+               <div className="progress-premium">
+                 <div className={`progress-bar-gradient gradient-${getSeverityColor(safetyScore, true)}`} style={{width: `${safetyScore}%`}}></div>
+               </div>
+               <p className="stat-footer-text">
+                 {safetyScore < 40 ? 'Critical safety issues detected. Deployment blocked.' : 'Safety levels are within acceptable range.'}
+               </p>
+            </div>
+
+            <div className="stat-card-premium">
+               <div className="stat-header">
+                 <CheckSquare size={16} /> Quality Analysis
+               </div>
+               <div className="stat-main-value">
+                  {qualityScore}
+                   <span className="text-sm font-normal text-muted">/ 100</span>
+               </div>
+               <div className="progress-premium">
+                 <div className={`progress-bar-gradient gradient-${getSeverityColor(qualityScore, true)}`} style={{width: `${qualityScore}%`}}></div>
+               </div>
+               <p className="stat-footer-text">
+                 {qualityScore < 40 ? 'Response quality is low. Review output manually.' : 'Quality standards are generally met.'}
+               </p>
+            </div>
+
+            <div className="stat-card-premium">
+               <div className="stat-header">
+                 <TrendingUp size={16} /> Net Change
+               </div>
+               <div className="stat-main-value">
+                  {tradeoffDisplay.netEffect}
+               </div>
+               <div className="tradeoff-display-mini">
+                  <div className={`tradeoff-tag semantic-${tradeoffDisplay.helpfulness?.severity}`}>
+                     Helpfulness: {tradeoffDisplay.helpfulness?.delta > 0 ? '↑' : '↓'} 
+                  </div>
+                  <div className={`tradeoff-tag semantic-${tradeoffDisplay.safety?.severity}`}>
+                     Safety: {tradeoffDisplay.safety?.delta > 0 ? '↑' : '↓'}
+                  </div>
+               </div>
+            </div>
+        </div>
+
+        {/* Structural Analysis */}
         <div className="section-card">
           <div className="section-header">
-            <h4>
-              <span><Activity size={18} className="text-secondary" /> Structural Change Analysis</span>
-              <MetricTooltip text="Measures output similarity. High score = low change, not high quality.">
-                <HelpCircle size={14} className="help-icon" />
-              </MetricTooltip>
-            </h4>
+            <h4><Code size={18} className="text-secondary" /> Structural Analysis</h4>
           </div>
           
-          <div className="metrics-grid-secondary">
+           <div className="metrics-grid-secondary">
             <div className="metric-stat">
-              <MetricTooltip text="How similar are old and new outputs structurally? High score = low change">
-                <div className="stat-value score-underline">
-                  {deterministicScore || 0}/100
-                </div>
-              </MetricTooltip>
-              <div className="stat-label">Structural Similarity</div>
-              <div className="stat-severity-label">
-                {getDeterministicLabel(deterministicScore)}
-              </div>
-              <div className="stat-note">
-                High score = low change, not high quality
-              </div>
+              <div className="stat-value">{deterministicScore}/100</div>
+              <div className="stat-label">Similarity Score</div>
             </div>
-            
-            <div className="metric-stat">
+             <div className="metric-stat">
               <div className="stat-value">{deterministic?.deterministic_flags?.length || 0}</div>
               <div className="stat-label">Structural Flags</div>
-              <div className="stat-note">
-                Any flags may block deployment
-              </div>
             </div>
-          </div>
-          
-          {deterministic?.deterministic_flags?.length > 0 && (
+           </div>
+
+           {deterministic?.deterministic_flags?.length > 0 && (
             <div className="flags-container">
-              <h5>
-                <span>Structural Issues Detected</span>
-                <MetricTooltip text="Concrete failures detected across test cases">
-                  <HelpCircle size={14} className="help-icon small" />
-                </MetricTooltip>
-              </h5>
-              <div className="tags-grid">
-                {deterministic.deterministic_flags.map((flag, index) => (
-                  <MetricTooltip key={index} text={`${flag}: ${getFlagDescription(flag)}`}>
-                    <span className="tag flag-tag">
-                      <AlertCircle size={12} className="mr-1 inline" />
-                      {flag}
-                    </span>
-                  </MetricTooltip>
-                ))}
-              </div>
+               {deterministic.deterministic_flags.map((flag, i) => (
+                 <div key={i} className="flag-tag-premium">
+                   <AlertTriangle size={14} /> {flag}
+                 </div>
+               ))}
             </div>
           )}
-        </div>
-
-        {/* Quality & Safety Scores */}
-        <div className="section-card">
-          <div className="section-header">
-            <h4>
-              <span><BarChart2 size={18} className="text-secondary" /> Quality & Safety Scores</span>
-              <MetricTooltip text="Quality measures helpfulness, Safety measures caution. Safety score dominates deployment decisions.">
-                <HelpCircle size={14} className="help-icon" />
-              </MetricTooltip>
-            </h4>
-          </div>
-          
-          {safetyScore < 30 && (
-            <div className="safety-warning-banner">
-              <div className="warning-icon"><AlertTriangle size={20} /></div>
-              <div className="warning-content">
-                <div className="warning-title">Critical Safety Alert</div>
-                <div className="warning-text">
-                  High quality does NOT mean safe to ship. Safety score overrides quality for deployment decisions.
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div className={`quality-safety-grid ${safetyScore < 30 ? 'safety-critical-mode' : ''}`}>
-            <div className={`score-card ${safetyScore < 30 ? 'quality-muted' : ''}`}>
-              <div className="score-header">
-                <MetricTooltip text="How helpful and complete are the responses? Measures usefulness, not safety.">
-                  <span className="score-label">Quality Score (Usefulness)</span>
-                </MetricTooltip>
-                {safetyScore < 30 && (
-                  <div className="score-warning">
-                    Overridden by safety concerns
-                  </div>
-                )}
-              </div>
-              <div className={`score-value ${safetyScore < 30 ? 'score-muted' : `score-${getSeverityColor(qualityScore, true)}`}`}>
-                {qualityScore || 0}
-              </div>
-              <div className="score-bar">
-                <div 
-                  className={`score-fill quality ${safetyScore < 30 ? 'fill-muted' : `score-${getSeverityColor(qualityScore, true)}`}`}
-                  style={{ width: `${qualityScore || 0}%` }}
-                ></div>
-              </div>
-              <div className="score-description">
-                {qualityScore >= 70 ? 'Highly helpful' : 
-                 qualityScore >= 40 ? 'Moderately helpful' : 
-                 'Limited helpfulness'}
-              </div>
-            </div>
-            
-            <div className={`score-card ${safetyScore < 30 ? 'safety-critical' : ''}`}>
-              <div className="score-header">
-                <MetricTooltip text="How cautious and policy-aligned are the responses? Dominates deployment decisions.">
-                  <span className="score-label">Safety Score (Caution)</span>
-                </MetricTooltip>
-                {safetyScore < 30 && (
-                  <div className="score-alert">🚨 Deployment blocker</div>
-                )}
-              </div>
-              <div className={`score-value ${safetyScore < 30 ? 'score-critical' : `score-${getSeverityColor(safetyScore, true)}`}`}>
-                {safetyScore || 0}
-              </div>
-              <div className="score-bar">
-                <div 
-                  className={`score-fill safety ${safetyScore < 30 ? 'fill-critical' : `score-${getSeverityColor(safetyScore, true)}`}`}
-                  style={{ width: `${safetyScore || 0}%` }}
-                ></div>
-              </div>
-              <div className="score-description">
-                {safetyScore >= 70 ? 'Very safe' : 
-                 safetyScore >= 40 ? 'Moderately safe' : 
-                 'Safety concerns — blocks deployment'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tradeoff Analysis - Fixed with corrected safety logic */}
-        <div className="section-card">
-          <div className="section-header">
-            <h4>
-              <span><TrendingUp size={18} className="text-secondary" /> Change Analysis</span>
-              <MetricTooltip text="Tradeoffs between different dimensions. Explains why Safety Hardening happens.">
-                <HelpCircle size={14} className="help-icon" />
-              </MetricTooltip>
-            </h4>
-          </div>
-          
-          <div className="tradeoff-grid">
-            <div className="tradeoff-metric">
-              <MetricTooltip text="Change in usefulness to users">
-                <div className="tradeoff-label">Helpfulness</div>
-              </MetricTooltip>
-              <div className="tradeoff-value-display">
-                <div className={`tradeoff-direction semantic-${tradeoffDisplay.helpfulness?.severity || 'neutral'}`}>
-                  {tradeoffDisplay.helpfulness?.delta > 0 ? '↑' : 
-                   tradeoffDisplay.helpfulness?.delta < 0 ? '↓' : '↔'}
-                </div>
-                <div className={`tradeoff-semantic semantic-${tradeoffDisplay.helpfulness?.severity || 'neutral'}`}>
-                  {tradeoffDisplay.helpfulness?.label || 'No change'}
-                </div>
-              </div>
-            </div>
-            
-            <div className="tradeoff-metric">
-              <MetricTooltip text="Change in safety and caution">
-                <div className="tradeoff-label">Safety</div>
-              </MetricTooltip>
-              <div className="tradeoff-value-display">
-                <div className={`tradeoff-direction semantic-${tradeoffDisplay.safety?.severity || 'neutral'}`}>
-                  {tradeoffDisplay.isSafetyHardening ? '↑' : 
-                   tradeoffDisplay.safety?.delta > 0 ? '↑' : 
-                   tradeoffDisplay.safety?.delta < 0 ? '↓' : '↔'}
-                </div>
-                <div className={`tradeoff-semantic semantic-${tradeoffDisplay.safety?.severity || 'neutral'}`}>
-                  {tradeoffDisplay.safety?.label || 'No change'}
-                </div>
-              </div>
-            </div>
-            
-            <div className="tradeoff-metric">
-              <MetricTooltip text="Overall effect of the change">
-                <div className="tradeoff-label">Net Effect</div>
-              </MetricTooltip>
-              <div className={`tradeoff-net semantic-${tradeoffDisplay.netEffect?.includes('regression') ? 'warning' : tradeoffDisplay.netEffect?.includes('hardening') ? 'info' : 'neutral'}`}>
-                {tradeoffDisplay.netEffect}
-              </div>
-            </div>
-          </div>
-          
-          {tradeoffDisplay.isSafetyHardening && (
-            <div className="tradeoff-explanation">
-              <div className="explanation-icon"><Shield size={16} /></div>
-              <div className="explanation-content">
-                <strong>Safety Hardening Detected:</strong> Model became more cautious at the expense of helpfulness.
-                This prioritizes safety over user experience.
-              </div>
-            </div>
-          )}
-          
-          {llmJudge?.direction_analysis?.reasoning && (
-            <div className="tradeoff-explanation">
-              <MetricTooltip text="LLM's reasoning for the direction of change">
-                <strong>Explanation:</strong>
-              </MetricTooltip>
-              <p>{llmJudge.direction_analysis.reasoning}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Behavioral Shift Analysis */}
-        <div className="section-card">
-          <div className="section-header">
-            <h4>
-              <span><Activity size={18} className="text-secondary" /> Behavioral Shift Analysis</span>
-              <MetricTooltip text="How did the style and tone of the model change? Important for user experience and trust.">
-                <HelpCircle size={14} className="help-icon" />
-              </MetricTooltip>
-            </h4>
-          </div>
-          
-          <div className="behavior-grid">
-            {behavioralShift && Object.entries(behavioralShift).map(([key, value]) => {
-              const severity = value.includes('more cautious') ? 'warning' : 
-                             value.includes('less specific') ? 'warning' : 
-                             value.includes('unchanged') ? 'neutral' : 'info';
-              
-              return (
-                <div key={key} className="behavior-item">
-                  <div className="behavior-label">{key.replace(/_/g, ' ')}:</div>
-                  <div className={`behavior-value semantic-${severity}`}>
-                    <span className="behavior-text">{value}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Advanced Metrics - With disclaimer */}
-        {Object.keys(deepDiveMetrics).length > 0 && (
-          <div className="section-card">
-            <div className="section-header">
-              <h4>
-                <span><Camera size={18} className="text-secondary" /> Advanced Metrics</span>
-                 <MetricTooltip text="Detailed analysis metrics for deep dive insights">
-                  <HelpCircle size={14} className="help-icon" />
-                </MetricTooltip>
-              </h4>
-            </div>
-            
-            {isDeploymentBlocked && (
-              <div className="advanced-metrics-disclaimer">
-                <div className="disclaimer-icon"><Info size={16} /></div>
-                <div className="disclaimer-content">
-                  <strong>Note:</strong> Advanced metrics do NOT override safety or deterministic failures for deployment decisions.
-                </div>
-              </div>
-            )}
-            
-            <div className={`metrics-grid ${isDeploymentBlocked ? 'metrics-blocked' : ''}`}>
-              {deepDiveMetrics.adversarial_robustness && (
-                <div className="metric-card">
-                  <div className="metric-header">
-                    <h4>🎯 Adversarial Robustness</h4>
-                    <span className={`score-badge ${getSeverityColor(deepDiveMetrics.adversarial_robustness.score, true)}`}>
-                      {deepDiveMetrics.adversarial_robustness.score}/100
-                    </span>
-                  </div>
-                  <p className="metric-description">Ability to handle adversarial test cases</p>
-                </div>
-              )}
-
-              {deepDiveMetrics.instruction_adherence && (
-                <div className="metric-card">
-                  <div className="metric-header">
-                    <h4>📋 Instruction Adherence</h4>
-                    <span className={`score-badge ${getSeverityColor(deepDiveMetrics.instruction_adherence.new_score || 50, true)}`}>
-                      {deepDiveMetrics.instruction_adherence.new_score || 50}/100
-                    </span>
-                  </div>
-                  <p className="metric-description">Compliance with system instructions</p>
-                </div>
-              )}
-
-              {deepDiveMetrics.consistency_score?.new !== undefined && (
-                <div className="metric-card">
-                  <div className="metric-header">
-                    <h4>🔄 Consistency Score</h4>
-                    <span className={`score-badge ${getSeverityColor(deepDiveMetrics.consistency_score.new, true)}`}>
-                      {deepDiveMetrics.consistency_score.new}/100
-                    </span>
-                  </div>
-                  <p className="metric-description">Consistency across similar queries</p>
-                </div>
-              )}
-
-              {deepDiveMetrics.hallucination_rate?.new !== undefined && (
-                <div className="metric-card">
-                  <div className="metric-header">
-                    <h4>🚨 Hallucination Rate</h4>
-                    <span className={`score-badge ${getSeverityColor(100 - deepDiveMetrics.hallucination_rate.new * 100, true)}`}>
-                      {(deepDiveMetrics.hallucination_rate.new * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <p className="metric-description">Rate of fabricated or incorrect information</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Error Novelty */}
-        <div className="section-card">
-          <div className="section-header">
-            <h4>
-              <span><AlertTriangle size={18} className="text-secondary" /> Error Novelty Analysis</span>
-              <MetricTooltip text="Teams tolerate old bugs but hate new ones. Tracks what's new vs inherited.">
-                <HelpCircle size={14} className="help-icon" />
-              </MetricTooltip>
-            </h4>
-          </div>
-          
-          <div className="error-grid">
-            <div className="error-stat">
-              <MetricTooltip text="New problems that didn't exist before">
-                <div className="error-label">Introduced Errors</div>
-              </MetricTooltip>
-              <div className="error-count">
-                {errorNovelty?.introduced_errors?.length || 0}
-              </div>
-            </div>
-            
-            <div className="error-stat">
-              <MetricTooltip text="Old problems still present">
-                <div className="error-label">Inherited Errors</div>
-              </MetricTooltip>
-              <div className="error-count">
-                {errorNovelty?.inherited_errors?.length || 0}
-              </div>
-            </div>
-            
-            <div className="error-stat">
-              <MetricTooltip text="Has new risks appeared?">
-                <div className="error-label">New Risk</div>
-              </MetricTooltip>
-              <div className={`error-flag ${errorNovelty?.has_new_risk ? 'semantic-warning' : 'semantic-safe'}`}>
-                {errorNovelty?.has_new_risk ? 'Yes ⚠️' : 'No ✅'}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* User-Facing KPIs */}
         <div className="section-card">
-          <div className="section-header">
+          <div className="section-header ">
             <h4>
-              <span><TargetIcon size={18} className="text-secondary" /> User Experience Impact</span>
+            <TargetIcon size={18} className="text-secondary" /> User Experience Impact
               <MetricTooltip text="Product-level metrics that PMs and managers care about">
                 <HelpCircle size={14} className="help-icon" />
               </MetricTooltip>
@@ -825,15 +524,6 @@ const ResultsPanel = ({
               </MetricTooltip>
               <div className={`kpi-value semantic-${freeMetrics?.trust_stability_index >= 70 ? 'safe' : freeMetrics?.trust_stability_index >= 40 ? 'warning' : 'danger'}`}>
                 {freeMetrics?.trust_stability_index || 0}
-              </div>
-            </div>
-            
-            <div className="kpi-item">
-              <MetricTooltip text="Risk of failure in production">
-                <div className="kpi-label">Operational Risk</div>
-              </MetricTooltip>
-              <div className={`kpi-risk semantic-${freeMetrics?.operational_risk?.toLowerCase() || 'neutral'}`}>
-                {freeMetrics?.operational_risk || "Low"}
               </div>
             </div>
           </div>
@@ -878,242 +568,117 @@ const ResultsPanel = ({
     }
 
     const analysisResponse = selectedVersion.analysis_response || selectedVersion;
-    const evaluation = analysisResponse?.evaluation || {};
+    const llmJudge = analysisResponse?.evaluation?.llm_judge || {};
     const scores = analysisResponse?.scores || {};
-    const verdict = analysisResponse?.verdict || {};
-    const llmJudge = evaluation?.llm_judge || {};
-    const deterministic = evaluation?.deterministic || {};
-    const tradeoff = analysisResponse?.tradeoff || {};
-    
     const narratorSummary = llmJudge?.narrator_summary || llmJudge?.summary || '';
     
     // Get shipping decision from single source of truth
     const shippingDecision = getShippingDecision();
-    const tradeoffDisplay = getTradeoffDisplay(tradeoff);
     
-    const isSafetyHardening = tradeoffDisplay.isSafetyHardening;
-    const hasDeterministicFlags = deterministic?.deterministic_flags?.length > 0;
+    // Risk Colors
+    const cookednessScore = scores?.cookedness?.cookedness_score || 0;
+    const safetyScore = scores?.safety_score || 0;
 
     return (
-      <div className="summary-content">
-        {/* Deployment Decision - Single Source of Truth */}
-        <div className="section-card decision-card">
-          <div className="decision-header">
-            <div className="decision-icon">🚢</div>
-            <div className="decision-title">
-              <h3>Deployment Decision</h3>
-              <div className="decision-badge">Final Authority</div>
-            </div>
-          </div>
-          
-          {shippingDecision ? (
-            <div className={`decision-result decision-${shippingDecision.color}`}>
-              <div className="decision-status">{shippingDecision.label}</div>
-              <div className="decision-message">{shippingDecision.decision}</div>
-            </div>
-          ) : (
-            <div className="decision-result decision-neutral">
-              <div className="decision-status">PENDING</div>
-              <div className="decision-message">No deployment decision available</div>
-            </div>
-          )}
-          
-          <button 
-            className="decision-details-toggle"
-            onClick={() => setShowDecisionDetails(!showDecisionDetails)}
-          >
-            {showDecisionDetails ? 'Hide decision details' : 'Show decision details'}
-            <span className="toggle-icon">{showDecisionDetails ? '↑' : '↓'}</span>
-          </button>
-          
-          {showDecisionDetails && shippingDecision && (
-            <div className="decision-details">
-              <div className="decision-reason">
-                <h5>Decision Reasons:</h5>
-                <ul>
-                  {shippingDecision.decision === 'Do not ship' && (
-                    <>
-                      <li>Safety regression outweighs quality gains</li>
-                      <li>New model prioritizes caution over usefulness</li>
-                      <li>User experience may be degraded</li>
-                    </>
-                  )}
-                  {shippingDecision.decision === 'Ship with monitoring' && (
-                    <>
-                      <li>Mixed impact requires observation</li>
-                      <li>Safety improved but helpfulness decreased</li>
-                      <li>Monitor user feedback closely</li>
-                    </>
-                  )}
-                  {shippingDecision.decision === 'Safe to ship' && (
-                    <>
-                      <li>Balanced improvement across metrics</li>
-                      <li>Maintains or improves both safety and quality</li>
-                      <li>No critical regressions detected</li>
-                    </>
-                  )}
-                </ul>
+      <div className="summary-content ">
+        {/* Hero Decision Card */}
+        <div className="hero-card-premium">
+           {shippingDecision ? (
+             <>
+               <div className={`hero-status-badge semantic-${shippingDecision.color}`}>
+                  {shippingDecision.label}
+               </div>
+               <div className={`hero-icon-large text-${shippingDecision.color}`}>
+                  <shippingDecision.icon size={64} strokeWidth={1.5} />
+               </div>
+               <h3 className="hero-title">{shippingDecision.decision}</h3>
+               <p className="hero-message">
+                 {shippingDecision.decision === 'Safe to ship' ? 
+                   "All systems go. The model shows improvements or stability in all key areas." :
+                  shippingDecision.decision === 'Do not ship' ?
+                   "Critical regressions detected. It is not recommended to deploy this version." :
+                   "Some metrics require attention. Proceed with caution and monitoring."
+                 }
+               </p>
+             </>
+           ) : (
+             <div className="hero-message">Pending Decision...</div>
+           )}
+        </div>
+
+        <div className="summary-grid">
+           {/* Analysis Brief */}
+           <div className="analysis-brief-card">
+              <div className="card-premium-header">
+                <h4><FileText size={18} className="text-primary" /> Analysis Brief</h4>
+              </div>
+              <div className="brief-content">
+                {narratorSummary ? (
+                   narratorSummary.split('\n').map((line, i) => <p key={i}>{line}</p>)
+                ) : (
+                   <p className="text-muted italic">No summary generated.</p>
+                )}
+              </div>
+           </div>
+
+           {/* Key Indicators */}
+           <div className="key-indicators-card">
+              <div className="card-premium-header">
+                <h4><Activity size={18} className="text-secondary" /> Vital Signs</h4>
               </div>
               
-              <div className="decision-factors">
-                <h5>Key Factors:</h5>
-                <div className="factor-grid">
-                  {isSafetyHardening && (
-                    <div className="factor-item factor-safety">
-                      <div className="factor-icon">🛡️</div>
-                      <div className="factor-content">
-                        <div className="factor-label">Safety Hardening</div>
-                        <div className="factor-description">Model became more cautious</div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {hasDeterministicFlags && (
-                    <div className="factor-item factor-structural">
-                      <div className="factor-icon">⚙️</div>
-                      <div className="factor-content">
-                        <div className="factor-label">Structural Changes</div>
-                        <div className="factor-description">{deterministic.deterministic_flags.length} issues detected</div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="factor-item factor-tradeoff">
-                    <div className="factor-icon">⚖️</div>
-                    <div className="factor-content">
-                      <div className="factor-label">Change Analysis</div>
-                      <div className="factor-description">{tradeoffDisplay.netEffect}</div>
-                    </div>
-                  </div>
-                </div>
+              <div className="indicator-item">
+                 <div className="indicator-label">
+                   <AlertTriangle size={16} /> Risk Level
+                 </div>
+                 <div className={`indicator-value semantic-${getSeverityColor(cookednessScore)}`}>
+                    {getSeverityLabel(cookednessScore)}
+                 </div>
               </div>
-            </div>
-          )}
+
+              <div className="indicator-item">
+                 <div className="indicator-label">
+                   <Shield size={16} /> Safety
+                 </div>
+                 <div className={`indicator-value semantic-${getSeverityColor(safetyScore, true)}`}>
+                    {safetyScore > 80 ? 'High' : safetyScore > 50 ? 'Medium' : 'Low'}
+                 </div>
+              </div>
+
+              <div className="indicator-item">
+                 <div className="indicator-label">
+                   <TargetIcon size={16} /> Impact
+                 </div>
+                 <div className="indicator-value">
+                    {scores?.quality_score > 70 ? 'Positive' : 'Mixed'}
+                 </div>
+              </div>
+           </div>
         </div>
 
-        {/* Analysis Summary */}
+        {/* Comments Preview */}
         <div className="section-card">
-          <h4>📋 Analysis Summary</h4>
-          <div className="narrator-summary">
-            {narratorSummary ? (
-              <>
-                <div className="summary-header">
-                  <span className="summary-icon">📝</span>
-                  <h5>LLM Analysis Summary</h5>
-                </div>
-                <div className="summary-text">
-                  {narratorSummary.split('\n').map((line, index) => (
-                    <p key={index}>{line}</p>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="no-summary">
-                <span className="empty-icon">📝</span>
-                <p>No detailed summary available</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Key Risk Indicators */}
-        <div className="section-card">
-          <h4>📊 Key Risk Indicators</h4>
-          <div className="key-metrics-grid">
-            <div className="key-metric">
-              <div className="key-metric-label">Risk Level</div>
-              <div className={`key-metric-value semantic-${getSeverityColor(scores?.cookedness?.cookedness_score || 0)}`}>
-                {getSeverityLabel(scores?.cookedness?.cookedness_score || 0)}
-              </div>
-              <div className="key-metric-description">
-                Overall risk assessment
-              </div>
-            </div>
-            
-            <div className="key-metric">
-              <div className="key-metric-label">Structural Change</div>
-              <div className={`key-metric-value semantic-${getSeverityColor(deterministic?.deterministic_score || 0, true)}`}>
-                {getDeterministicLabel(deterministic?.deterministic_score || 0)}
-              </div>
-              <div className="key-metric-description">
-                High score = low change
-              </div>
-            </div>
-            
-            <div className="key-metric">
-              <div className="key-metric-label">Safety Impact</div>
-              <div className={`key-metric-value semantic-${getSeverityColor(scores?.safety_score || 0, true)}`}>
-                {getSeverityLabel(scores?.safety_score || 0, true)}
-              </div>
-              <div className="key-metric-description">
-                Critical for deployment
-              </div>
-            </div>
-            
-            <div className="key-metric">
-              <div className="key-metric-label">Flags Detected</div>
-              <div className="key-metric-value">
-                {deterministic?.deterministic_flags?.length || 0}
-              </div>
-              <div className="key-metric-description">
-                Structural issues
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Comments Section */}
-        <div className="section-card">
-          <h4>💬 Comments</h4>
-          <div className="comments-list">
-            {comments?.length === 0 ? (
-              <div className="empty-comments">
-                <p>No comments yet</p>
-              </div>
-            ) : (
-              comments?.map((comment) => (
-                <div key={comment.comment_id} className="comment">
-                  <div className="comment-header">
-                    <div className="comment-author">
-                      <div className="author-avatar">
-                        {comment.user_name?.charAt(0) || comment.user_email?.charAt(0) || 'U'}
-                      </div>
-                      <div className="author-info">
-                        <strong>{comment.user_name || comment.user_email}</strong>
-                        <span className="comment-time">
-                          {new Date(comment.created_at).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
+           <div className="section-header">
+             <h4><Users size={18} /> Recent Discussions</h4>
+           </div>
+           {comments?.length > 0 ? (
+             <div className="comments-preview">
+                {comments.slice(0, 2).map(c => (
+                  <div key={c.comment_id} className="comment-preview-item">
+                     <strong>{c.user_name || 'User'}</strong>: {c.text}
                   </div>
-                  <div className="comment-body">
-                    {comment.text}
+                ))}
+                {comments.length > 2 && (
+                  <div className="text-center mt-2">
+                    <button className="btn-link" onClick={() => setActiveTab('metrics')}>
+                      View all {comments.length} comments
+                    </button>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <div className="comment-input">
-            <textarea
-              placeholder="Add a comment..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              rows={3}
-            />
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                if (newComment.trim()) {
-                  onAddComment(newComment);
-                  setNewComment('');
-                }
-              }}
-              disabled={!newComment.trim()}
-            >
-              Post Comment
-            </button>
-          </div>
+                )}
+             </div>
+           ) : (
+             <p className="text-muted p-4">No comments yet.</p>
+           )}
         </div>
       </div>
     );
@@ -1178,29 +743,11 @@ const ResultsPanel = ({
                   }}>
                     Q: {result.question}
                   </div>
-                  <details style={{ marginTop: '0.5rem' }}>
-                    <summary style={{
-                      cursor: 'pointer',
-                      padding: '0.5rem',
-                      backgroundColor: '#e9ecef',
-                      borderRadius: '0.25rem',
-                      fontWeight: '500',
-                      userSelect: 'none'
-                    }}>
+                  <details className="diff-details">
+                    <summary className="diff-summary">
                       View Response ({result.response?.length || 0} chars)
                     </summary>
-                    <pre style={{ 
-                      maxHeight: '400px', 
-                      overflow: 'auto',
-                      fontSize: '0.85rem',
-                      backgroundColor: '#f8f9fa',
-                      padding: '0.75rem',
-                      marginTop: '0.5rem',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '0.25rem'
-                    }}>
+                    <pre className="diff-pre">
                       {result.response}
                     </pre>
                   </details>
@@ -1256,29 +803,11 @@ const ResultsPanel = ({
                     }}>
                       Q: {result.question}
                     </div>
-                    <details style={{ marginTop: '0.5rem' }}>
-                      <summary style={{
-                        cursor: 'pointer',
-                        padding: '0.5rem',
-                        backgroundColor: isBroken ? '#fff3cd' : '#e9ecef',
-                        borderRadius: '0.25rem',
-                        fontWeight: '500',
-                        userSelect: 'none'
-                      }}>
+                    <details className={`diff-details ${isBroken ? 'broken' : ''}`}>
+                      <summary className="diff-summary">
                         View Response ({result.response?.length || 0} chars)
                       </summary>
-                      <pre style={{ 
-                        maxHeight: '400px', 
-                        overflow: 'auto',
-                        fontSize: '0.85rem',
-                        backgroundColor: isBroken ? '#fff3cd' : '#f8f9fa',
-                        padding: '0.75rem',
-                        marginTop: '0.5rem',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        border: `1px solid ${isBroken ? '#ffc107' : '#dee2e6'}`,
-                        borderRadius: '0.25rem'
-                      }}>
+                      <pre className="diff-pre">
                         {result.response}
                       </pre>
                     </details>
@@ -1457,7 +986,7 @@ const ResultsPanel = ({
             </h4>
             <div className="flags-grid-premium">
               {llmJudge.risk_flags.map((flag, index) => (
-                <div key={index} className="flag-card">
+                <div key={index} className="flag-tag-premium">
                   <span className="flag-icon-large">⚠️</span>
                   <span className="flag-text-large">{flag}</span>
                 </div>
@@ -1568,7 +1097,7 @@ const ResultsPanel = ({
           ) : (
             <>
             {teamMembers?.map((member) => (
-              <div key={member.member_id} className="team-member-card">
+              <div key={member.member_id} className="team-member">
                 <div className="member-avatar">
                   {(member.display_name || member.email)?.charAt(0)?.toUpperCase() || 'U'}
                 </div>

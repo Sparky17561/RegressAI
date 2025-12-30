@@ -258,13 +258,7 @@ const SettingsModal = ({ isOpen, onClose, isPremium }) => {
         </div>
 
         <div className="modal-footer">
-          <button 
-            className="btn btn-secondary"
-            onClick={onClose}
-            disabled={saving}
-          >
-            Cancel
-          </button>
+
           {!isPremium && (
             <button 
               className="btn btn-primary"

@@ -432,14 +432,14 @@ Remember: If you're uncertain about a specific rule, rate, or timeframe, say so 
                     <button 
                       type="button"
                       className="number-btn"
-                      onClick={() => handleInputChange('numCases', Math.min(showPremiumUI ? 50 : 10, parseInt(formData.numCases) + 1))}
+                      onClick={() => handleInputChange('numCases', Math.min(showPremiumUI ? 50 : 20, parseInt(formData.numCases) + 1))}
                     >
                       <Plus size={14} />
                     </button>
                   </div>
                 </div>
                 <div className="input-hint">
-                  {showPremiumUI ? 'Up to 50 cases' : 'Max 10 cases'}
+                  {showPremiumUI ? 'Up to 50 cases' : 'Max 20 cases'}
                 </div>
               </div>
             </div>
@@ -562,15 +562,7 @@ Remember: If you're uncertain about a specific rule, rate, or timeframe, say so 
               </button>
             ) : (
               <div className="premium-upsell">
-                <p>
-                  Need deeper analysis? 
-                  <button 
-                    className="btn-link"
-                    onClick={() => window.location.hash = '#pricing'}
-                  >
-                    Upgrade to Premium
-                  </button>
-                </p>
+                
               </div>
             )}
             
