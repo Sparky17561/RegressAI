@@ -8,7 +8,9 @@ import {
   Users, 
   GitBranch, 
   Search, 
-  X
+  X,
+  Sun,
+  Moon
 } from "lucide-react";
 import "./Landing1.css";
 
@@ -54,20 +56,24 @@ const Landing1 = () => {
                   </a>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 md:gap-4">
                 <button
                   onClick={toggleTheme}
-                  className="font-gothic bg-[var(--color-bg-light)] rounded-xl border border-[var(--border)] px-4 py-2 hover:bg-[var(--color-bg)] transition-colors text-xs uppercase tracking-widest"
+                  className="font-gothic bg-[var(--color-bg-light)] rounded-xl border border-[var(--border)] p-2 md:px-4 md:py-2 hover:bg-[var(--color-bg)] transition-colors text-xs uppercase tracking-widest flex items-center justify-center"
+                  aria-label="Toggle Theme"
                 >
-                  {themeMode === "dark" ? "Light" : "Dark"} mode
+                  <span className="hidden md:inline">{themeMode === "dark" ? "Light" : "Dark"} mode</span>
+                  <span className="md:hidden">
+                    {themeMode === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+                  </span>
                 </button>
-                <Link to="/login">
-                  <button className="text-sm font-gothic px-4 py-2 hover:bg-[var(--color-bg-light)] rounded-xl transition-colors">
+                <Link to="/login" className="hidden sm:block">
+                  <button className="text-xs md:text-sm font-gothic px-3 py-1.5 md:px-4 md:py-2 hover:bg-[var(--color-bg-light)] rounded-xl transition-colors">
                     Log in
                   </button>
                 </Link>
                 <Link to="/app">
-                  <button className="bg-[var(--color-maintext)] text-[var(--color-background)] rounded-full px-6 py-2 text-sm font-gothic hover:opacity-90 transition-opacity">
+                  <button className="bg-[var(--color-maintext)] text-[var(--color-background)] rounded-full px-4 py-1.5 md:px-6 md:py-2 text-xs md:text-sm font-gothic hover:opacity-90 transition-opacity whitespace-nowrap">
                     Get Started
                   </button>
                 </Link>
@@ -82,7 +88,7 @@ const Landing1 = () => {
                 v1.0 is now live
               </span>
               <h1 className="text-5xl md:text-8xl font-bbh tracking-tight mb-8 text-balance uppercase leading-none">
-                Complete platform <br/> <span className="text-[var(--color-subtext)]">to build AI.</span>
+                The Safety Net <br/> <span className="text-[var(--color-subtext)]">For GenAI Engineering.</span>
               </h1>
               <p className="text-xl md:text-2xl font-lora text-[var(--color-subtext)] mb-12 text-balance max-w-2xl mx-auto leading-relaxed italic">
                 Prevent prompt regressions before they reach production. Build, deploy, and scale the best LLM
@@ -127,6 +133,75 @@ const Landing1 = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* Innovation & Challenges Section */}
+          <section id="innovation" className="py-24 px-6 border-b border-[var(--border)]">
+            <div className="container mx-auto">
+              {/* Innovation Track */}
+              <div className="mb-24">
+                <span className="mb-6 inline-block uppercase tracking-wider px-4 py-1 text-[10px] font-gothic border border-[var(--border)] bg-[var(--color-bg-light)] rounded-full text-[var(--color-maintext)]">
+              OUR UNIQUE APPROACH
+                </span>
+                <h2 className="text-3xl md:text-5xl font-bbh mb-6 tracking-tight uppercase leading-none">
+                  A New Developer Tooling Layer
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  <div>
+                    <p className="text-lg font-lora text-[var(--color-subtext)] leading-relaxed mb-6">
+                      RegressAI introduces a <span className="text-[var(--color-maintext)] font-bold">unique developer tooling layer for LLM systems</span>. 
+                      It addresses the unsolved problem of regression testing for probabilistic AI behavior.
+                    </p>
+                    <p className="text-lg font-lora text-[var(--color-subtext)] leading-relaxed">
+                      By bridging research-level evaluation with production-grade tooling, we enable safer AI deployment at scale.
+                    </p>
+                  </div>
+                  <div className="bg-[var(--color-bg-light)] p-8 rounded-2xl border border-[var(--border)]">
+                    <ul className="space-y-4">
+                      <li className="flex gap-4">
+                         <div className="w-6 h-6 rounded-full bg-[var(--color-maintext)]/10 flex items-center justify-center shrink-0">
+                           <Zap size={14} className="text-[var(--color-maintext)]" />
+                         </div>
+                         <p className="font-gothic text-sm leading-relaxed"><strong className="block mb-1 uppercase tracking-wider text-xs">Novel Hybrid Evaluation</strong> Combining deterministic checks with behavioral analysis.</p>
+                      </li>
+                      <li className="flex gap-4">
+                         <div className="w-6 h-6 rounded-full bg-[var(--color-maintext)]/10 flex items-center justify-center shrink-0">
+                           <CheckCircle2 size={14} className="text-[var(--color-maintext)]" />
+                         </div>
+                         <p className="font-gothic text-sm leading-relaxed"><strong className="block mb-1 uppercase tracking-wider text-xs">Unambiguous Decisions</strong> Converts complex changes into clear "Ship / No-Ship" verdicts.</p>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Challenges & Solutions */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                 <div className="lg:col-span-1">
+                    <h3 className="text-2xl font-bbh mb-4 uppercase">Challenges Solved</h3>
+                    <p className="font-lora text-[var(--color-subtext)] italic text-sm">
+                      Designing accurate, trustworthy evaluation for non-deterministic LLMs was our biggest hurdle.
+                    </p>
+                 </div>
+                 <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-[var(--color-bg)] p-6 rounded-xl border border-[var(--border)] relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                      <h4 className="font-gothic font-bold text-xs uppercase tracking-widest mb-3 text-red-400">The Problem</h4>
+                      <p className="text-sm font-fira text-[var(--color-subtext)] leading-relaxed">
+                        Early versions mixed quality, safety, and structure into a single score, leading to misleading results when one metric improved while another regressed.
+                      </p>
+                    </div>
+                     <div className="bg-[var(--color-bg)] p-6 rounded-xl border border-[var(--border)] relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                      <h4 className="font-gothic font-bold text-xs uppercase tracking-widest mb-3 text-green-400">The Solution</h4>
+                      <p className="text-sm font-fira text-[var(--color-subtext)] leading-relaxed">
+                        We separated deterministic metrics from interpretive analysis and ensured every metric is directly derived from observable outputs, forcing safety-first rules.
+                      </p>
+                    </div>
+                 </div>
+              </div>
+
             </div>
           </section>
 
@@ -213,6 +288,80 @@ const Landing1 = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </section>
+
+
+
+          {/* Timeline / How it Works Section */}
+          <section className="py-24 px-6 border-t border-[var(--border)] bg-[var(--color-bg-light)]/30">
+            <div className="container mx-auto">
+              <div className="text-center max-w-3xl mx-auto mb-16 animate-appear">
+                 <span className="mb-4 inline-block uppercase tracking-[0.2em] font-bold font-gothic text-xs border border-[var(--border)] px-4 py-1 rounded-full bg-[var(--color-bg-light)]">
+                  Workflow
+                 </span>
+                 <h2 className="text-4xl md:text-6xl font-bbh mb-6 tracking-tight uppercase leading-none">From Prompt to Deploy</h2>
+                 <p className="text-lg font-lora text-[var(--color-subtext)] italic">The complete lifecycle of a secure LLM update.</p>
+              </div>
+
+              <div className="relative">
+                 {/* Timeline Line */}
+                 <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-px bg-[var(--border)] hidden md:block"></div>
+
+                 <div className="space-y-12 md:space-y-24 relative">
+                    {/* Step 1 */}
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 group">
+                       <div className="flex-1 text-center md:text-right md:pr-8">
+                          <h3 className="text-2xl font-bbh uppercase mb-2">1. Connect & configure</h3>
+                          <p className="font-gothic text-sm text-[var(--color-subtext)]">Login and securely enter your API keys for analysis.</p>
+                       </div>
+                       <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--color-maintext)] text-[var(--color-background)] flex items-center justify-center font-bold font-gothic border-4 border-[var(--color-background)] shadow-lg group-hover:scale-110 transition-transform">1</div>
+                       <div className="flex-1 md:pl-8 text-center md:text-left opacity-60">
+                          <div className="inline-block px-3 py-1 rounded border border-[var(--border)] bg-[var(--color-bg)] font-fira text-xs">Login &gt; API Key</div>
+                       </div>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="flex flex-col md:flex-row-reverse items-center justify-center gap-8 md:gap-16 group">
+                       <div className="flex-1 text-center md:text-left md:pl-8">
+                          <h3 className="text-2xl font-bbh uppercase mb-2">2. Define Architecture</h3>
+                          <p className="font-gothic text-sm text-[var(--color-subtext)]">Specify your Old vs New prompt architecture.</p>
+                       </div>
+                       <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-maintext)] text-[var(--color-maintext)] flex items-center justify-center font-bold font-gothic border-4 border-[var(--color-background)] shadow-lg group-hover:scale-110 transition-transform">2</div>
+                       <div className="flex-1 md:pr-8 text-center md:text-right opacity-60">
+                          <div className="inline-block px-3 py-1 rounded border border-[var(--border)] bg-[var(--color-bg)] font-fira text-xs">Spec Architectures</div>
+                       </div>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 group">
+                       <div className="flex-1 text-center md:text-right md:pr-8">
+                          <h3 className="text-2xl font-bbh uppercase mb-2">3. System Prompt & Run</h3>
+                          <p className="font-gothic text-sm text-[var(--color-subtext)]">Input your system instructions and generate the analysis run.</p>
+                       </div>
+                       <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-maintext)] text-[var(--color-maintext)] flex items-center justify-center font-bold font-gothic border-4 border-[var(--color-background)] shadow-lg group-hover:scale-110 transition-transform">3</div>
+                       <div className="flex-1 md:pl-8 text-center md:text-left opacity-60">
+                          <div className="inline-block px-3 py-1 rounded border border-[var(--border)] bg-[var(--color-bg)] font-fira text-xs">Generate Analysis</div>
+                       </div>
+                    </div>
+
+                    {/* Step 4 (Premium) */}
+                    <div className="flex flex-col md:flex-row-reverse items-center justify-center gap-8 md:gap-16 group">
+                       <div className="flex-1 text-center md:text-left md:pl-8">
+                          <div className="inline-block mb-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full">Premium</div>
+                          <h3 className="text-2xl font-bbh uppercase mb-2">4. Deep Dive Analysis</h3>
+                          <p className="font-gothic text-sm text-[var(--color-subtext)]">Unlock advanced hallucination checks and edge-case detection.</p>
+                       </div>
+                       <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-white flex items-center justify-center font-bold font-gothic border-4 border-[var(--color-background)] shadow-lg group-hover:scale-110 transition-transform">
+                          <Zap size={20} fill="currentColor" />
+                       </div>
+                       <div className="flex-1 md:pr-8 text-center md:text-right opacity-60">
+                          <div className="inline-block px-3 py-1 rounded border border-[var(--border)] bg-[var(--color-bg)] font-fira text-xs">Deep Analysis</div>
+                       </div>
+                    </div>
+
+                 </div>
               </div>
             </div>
           </section>
@@ -309,7 +458,7 @@ const Landing1 = () => {
             <div className="container mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 text-center md:text-left">
               <div className="col-span-1 md:col-span-2 flex flex-col items-center md:items-start">
                 <Link to="/" className="flex items-center gap-2 font-bbh text-2xl tracking-tighter mb-6 uppercase">
-                  <div className="w-8 h-8 bg-[var(--color-maintext)] rounded-full" />
+                  <img src="/logo.png" alt="RegressAI" className="w-8 h-8 object-contain" />
                   RegressAI
                 </Link>
                 <p className="font-lora text-[var(--color-subtext)] max-w-sm leading-relaxed italic">
