@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { 
+  Bell, 
+  Settings, 
+  LogOut, 
+  Moon, 
+  Sun,
+  User,
+  Sparkles
+} from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import SetupPanel from '../components/SetupPanel';
 import ResultsPanel from '../components/ResultsPanel';
@@ -24,7 +33,11 @@ const Dashboard = () => {
   const [teamMembers, setTeamMembers] = useState([]);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   
+  // Theme State
+  const [theme, setTheme] = useState(localStorage.getItem('theme-mode') || 'system');
+
   const { currentUser, logout } = useAuth();
   const { is_premium: isPremium, deep_dives_remaining: deepDivesRemaining, checkSubscription } = usePremium();
   const navigate = useNavigate();
@@ -35,19 +48,33 @@ const Dashboard = () => {
       return;
     }
     
+    // Apply theme
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const effectiveTheme = theme === "system" ? systemTheme : theme;
+    document.documentElement.setAttribute("data-theme", effectiveTheme);
+    localStorage.setItem("theme-mode", theme);
+
     loadInitialData();
     checkSubscription();
-  }, [currentUser]);
+  }, [currentUser, theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   const loadInitialData = async () => {
     try {
-      const [casesData, notifications] = await Promise.all([
+      const [casesData, notificationsData] = await Promise.all([
         apiService.fetchCases(),
         apiService.fetchNotifications()
       ]);
       
       setCases(casesData.cases || []);
       
+      // Calculate Unread Count
+      const unread = (notificationsData.notifications || []).filter(n => !n.read).length;
+      setUnreadCount(unread);
+
       if (casesData.cases?.length > 0) {
         const firstCase = casesData.cases[0];
         setActiveCase(firstCase);
@@ -59,6 +86,17 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  const refreshNotifications = async () => {
+    try {
+      const data = await apiService.fetchNotifications();
+      const unread = (data.notifications || []).filter(n => !n.read).length;
+      setUnreadCount(unread);
+    } catch (e) {
+      console.error("Failed to refresh notifications", e);
+    }
+  };
+// ... existing code ...
 
   // ---------------------- loadCaseDetails ----------------------
 const loadCaseDetails = async (caseId) => {
@@ -293,32 +331,67 @@ const handleSelectVersion = async (version) => {
       {/* Top Navigation Bar */}
       <nav className="top-nav">
         <div className="nav-left">
-          <button
-            className="notifications-btn"
-            onClick={() => setNotificationsOpen(!notificationsOpen)}
-          >
-            🔔
-            <span className="notification-badge">3</span>
-          </button>
-          <div className="user-info">
-            <div className="user-avatar">
-              {currentUser?.email?.charAt(0).toUpperCase()}
-            </div>
-            <span className="user-email">{currentUser?.email}</span>
+          <div className="page-title">
+            {activeCase ? (
+              <>
+                <span className="text-muted">Workspace /</span> {activeCase.name}
+              </>
+            ) : 'Dashboard'}
           </div>
         </div>
+        
         <div className="nav-right">
           {isPremium && (
             <div className="premium-indicator">
-              <span className="badge premium">✨ PRO</span>
-              <span className="deep-dives">{deepDivesRemaining} deep dives left</span>
+              <Sparkles size={14} className="text-yellow-400" fill="currentColor" />
+              <span className="badge-text">PRO</span>
             </div>
           )}
-          <button className="btn btn-secondary" onClick={() => setSettingsOpen(true)}>
-            ⚙️ Settings
+
+          <button 
+            className="nav-icon-btn theme-toggle" 
+            onClick={toggleTheme}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
           </button>
-          <button className="btn btn-danger" onClick={logout}>
-            Logout
+
+          <button
+            className="nav-icon-btn notifications-btn"
+            onClick={() => {
+              setNotificationsOpen(!notificationsOpen);
+              refreshNotifications(); // Refresh when opening
+            }}
+            title="Notifications"
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="notification-badge">{unreadCount}</span>
+            )}
+          </button>
+
+          <div className="divider-vertical"></div>
+
+          <div className="user-menu">
+            <div className="user-avatar" title={currentUser?.email}>
+              {currentUser?.email?.charAt(0).toUpperCase()}
+            </div>
+          </div>
+
+          <button 
+            className="nav-icon-btn" 
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+          >
+            <Settings size={20} />
+          </button>
+          
+          <button 
+            className="nav-icon-btn logout-btn" 
+            onClick={logout}
+            title="Logout"
+          >
+            <LogOut size={20} />
           </button>
         </div>
       </nav>
@@ -351,13 +424,17 @@ const handleSelectVersion = async (version) => {
             teamMembers={teamMembers}
             onAddComment={handleAddComment}
             isPremium={isPremium}
+            onInvite={() => setInviteOpen(true)}
           />
         </div>
       </div>
 
       {/* Modals */}
       {notificationsOpen && (
-        <Notifications onClose={() => setNotificationsOpen(false)} />
+        <Notifications onClose={() => {
+          setNotificationsOpen(false);
+          refreshNotifications();
+        }} />
       )}
       
       {settingsOpen && (

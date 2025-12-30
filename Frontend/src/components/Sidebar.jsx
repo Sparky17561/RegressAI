@@ -1,5 +1,17 @@
 import { useState } from 'react';
+import { 
+  BrainCircuit, 
+  Plus, 
+  Trash2, 
+  Edit2, 
+  ChevronRight, 
+  ChevronDown, 
+  FileText, 
+  Microscope,
+  Box
+} from 'lucide-react';
 import PricingModal from './Modals/PricingModal';
+import NewCaseModal from './Modals/NewCaseModal'; // Import the new modal
 import { usePremium } from '../contexts/PremiumContext';
 import './Sidebar.css';
 
@@ -15,13 +27,37 @@ const Sidebar = ({
   const [expandedCase, setExpandedCase] = useState(activeCase?.case_id || null);
   const [showPricing, setShowPricing] = useState(false);
   
-  // ✅ Get premium status from context
+  // Modal States
+  const [isCaseModalOpen, setIsCaseModalOpen] = useState(false);
+  const [caseModalMode, setCaseModalMode] = useState('create');
+  const [caseToRename, setCaseToRename] = useState(null);
+  
   const { is_premium, deep_dives_remaining } = usePremium();
 
-  const handleCreateCase = () => {
-    const name = prompt('Enter case name:');
-    if (name) {
+  // --- Handlers ---
+
+  const openCreateModal = () => {
+    setCaseModalMode('create');
+    setCaseToRename(null);
+    setIsCaseModalOpen(true);
+  };
+
+  const openRenameModal = (caseItem, e) => {
+    e.stopPropagation();
+    setCaseModalMode('rename');
+    setCaseToRename(caseItem);
+    setIsCaseModalOpen(true);
+  };
+
+  const handleModalSubmit = (name) => {
+    if (caseModalMode === 'create') {
       onCreateCase(name);
+    } else if (caseModalMode === 'rename' && caseToRename) {
+      if (name !== caseToRename.name) {
+        // In a real app, you'd call an update function here
+        console.log('Rename case:', caseToRename.case_id, 'to', name);
+        // Optimistic update or callback could go here
+      }
     }
   };
 
@@ -34,12 +70,18 @@ const Sidebar = ({
     }
   };
 
+  const handleDeleteCase = (caseItem, e) => {
+    e.stopPropagation();
+    if (window.confirm(`Delete case "${caseItem.name}"? This action cannot be undone.`)) {
+      console.log('Delete case:', caseItem.case_id);
+    }
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+      day: 'numeric'
     });
   };
 
@@ -49,177 +91,169 @@ const Sidebar = ({
     return 'safe';
   };
 
-  const handleRenameCase = (caseItem, e) => {
-    e.stopPropagation();
-    const newName = prompt('Rename case:', caseItem.name);
-    if (newName && newName.trim() !== caseItem.name) {
-      // Call your update case function here
-      console.log('Rename case:', caseItem.case_id, 'to', newName);
-    }
-  };
-
-  const handleDeleteCase = (caseItem, e) => {
-    e.stopPropagation();
-    if (window.confirm(`Delete case "${caseItem.name}"? This action cannot be undone.`)) {
-      // Call your delete case function here
-      console.log('Delete case:', caseItem.case_id);
-    }
-  };
-
-  const handleUpgradeSuccess = () => {
-    console.log('Upgrade successful!');
-    setShowPricing(false);
-    // The PremiumContext will handle the state update
-  };
-
   return (
     <>
       <aside className="sidebar">
+        {/* Header */}
         <div className="sidebar-header">
           <div className="brand">
-            <div className="logo">
-              <div className="logo-icon">🧠</div>
-              <div className="logo-text">
-                <h2>RegressAI</h2>
-                <p className="subtitle">Version Control for LLMs</p>
-              </div>
+            <div className="logo-icon-wrapper">
+              <BrainCircuit className="logo-icon" size={24} />
             </div>
-            <button 
-              className="btn btn-primary btn-new-case"
-              onClick={handleCreateCase}
-            >
-              + New Case
-            </button>
+            <div className="brand-text">
+              <h2>RegressAI</h2>
+              <span className="brand-version">v1.0</span>
+            </div>
           </div>
+          <button 
+            className="btn-new-case"
+            onClick={openCreateModal}
+          >
+            <Plus size={16} />
+            New Case
+          </button>
         </div>
 
-        <div className="cases-list">
+        {/* Scrollable List */}
+        <div className="cases-list-container">
           {cases.length === 0 ? (
             <div className="empty-state">
+              <Box size={32} className="empty-icon" />
               <p>No cases yet</p>
               <button 
-                className="btn btn-secondary btn-sm"
-                onClick={handleCreateCase}
+                className="btn-link"
+                onClick={openCreateModal}
               >
-                + Create First Case
+                Create your first case
               </button>
             </div>
           ) : (
-            <div className="cases-container">
-              {cases.map((caseItem) => (
-                <div 
-                  key={caseItem.case_id}
-                  className={`case-item ${activeCase?.case_id === caseItem.case_id ? 'active' : ''}`}
-                >
+            <div className="cases-list">
+              <div className="list-title">MY WORKSPACE</div>
+              {cases.map((caseItem) => {
+                const isActive = activeCase?.case_id === caseItem.case_id;
+                const isExpanded = expandedCase === caseItem.case_id;
+
+                return (
                   <div 
-                    className="case-header"
-                    onClick={() => handleCaseClick(caseItem)}
+                    key={caseItem.case_id}
+                    className={`case-item ${isActive ? 'active' : ''}`}
                   >
-                    <div className="case-main">
-                      <span className={`expand-icon ${expandedCase === caseItem.case_id ? 'expanded' : ''}`}>
-                        ▶
+                    <div 
+                      className="case-row"
+                      onClick={() => handleCaseClick(caseItem)}
+                    >
+                      <span className="case-icon">
+                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </span>
-                      <div className="case-info">
-                        <h3 className="case-name">{caseItem.name}</h3>
-                        <p className="case-meta">
-                          {caseItem.version_count || 0} version{caseItem.version_count !== 1 ? 's' : ''}
-                        </p>
+                      <span className="case-name">{caseItem.name}</span>
+                      
+                      <div className="case-actions">
+                        <button 
+                          className="action-btn"
+                          onClick={(e) => openRenameModal(caseItem, e)}
+                          title="Rename"
+                        >
+                          <Edit2 size={12} />
+                        </button>
+                        <button 
+                          className="action-btn danger"
+                          onClick={(e) => handleDeleteCase(caseItem, e)}
+                          title="Delete"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </div>
                     </div>
-                    <div className="case-actions">
-                      <button 
-                        className="btn-icon"
-                        onClick={(e) => handleRenameCase(caseItem, e)}
-                        title="Rename"
-                      >
-                        ✏️
-                      </button>
-                      <button 
-                        className="btn-icon"
-                        onClick={(e) => handleDeleteCase(caseItem, e)}
-                        title="Delete"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
 
-                  {expandedCase === caseItem.case_id && (
-                    <div className="versions-list">
-                      {versions.length === 0 ? (
-                        <div className="empty-versions">
-                          <p>No versions yet</p>
-                        </div>
-                      ) : (
-                        versions.map((version) => {
-                          // 🔥 CRITICAL FIX: Check for deep dive flag
-                          const isDeepDive = version.is_deep_dive || false;
-                          
-                          return (
-                            <div
-                              key={version.version_id}
-                              className={`version-item ${selectedVersion?.version_id === version.version_id ? 'active' : ''}`}
-                              onClick={() => onSelectVersion(version)}
-                            >
-                              <div className="version-header">
-                                <div className="version-info">
-                                  <span className="version-number">
-                                    v{version.version_number}
-                                    {isDeepDive && (
-                                      <span className="badge deep-dive-small">🔬</span>
-                                    )}
-                                  </span>
-                                  <span className="version-date">
-                                    {formatDate(version.created_at)}
-                                  </span>
+                    {/* Versions Sub-list */}
+                    {isExpanded && (
+                      <div className="versions-list">
+                        {versions.length === 0 ? (
+                          <div className="empty-versions">No versions</div>
+                        ) : (
+                          versions.map((version) => {
+                            const isSelected = selectedVersion?.version_id === version.version_id;
+                            const isDeepDive = version.is_deep_dive || false;
+
+                            return (
+                              <div
+                                key={version.version_id}
+                                className={`version-item ${isSelected ? 'selected' : ''}`}
+                                onClick={() => onSelectVersion(version)}
+                              >
+                                <div className="version-left">
+                                  {isDeepDive ? (
+                                    <Microscope size={14} className="icon-deep-dive" />
+                                  ) : (
+                                    <FileText size={14} className="icon-file" />
+                                  )}
+                                  <span className="v-num">v{version.version_number}</span>
                                 </div>
-                                <div className={`score score-${getScoreColor(version.cookedness_score || 0)}`}>
-                                  {version.cookedness_score || 0}
+                                <div className="version-right">
+                                  <span className={`score-dot ${getScoreColor(version.cookedness_score || 0)}`}></span>
+                                  <span className="v-date">{formatDate(version.created_at)}</span>
                                 </div>
                               </div>
-                              <div className="version-meta">
-                                <span className="verdict">{version.verdict || 'Unknown'}</span>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
+        {/* Footer */}
         <div className="sidebar-footer">
-          {/* ✅ Use is_premium from context */}
           {is_premium ? (
-            <div className="premium-badge">
-              <span className="badge premium">✨ PRO</span>
-              <span className="premium-info">
-                Deep dives remaining: {deep_dives_remaining}
-              </span>
+            <div className="premium-card">
+              <div className="premium-header">
+                <span className="badge-pro">PRO PLAN</span>
+              </div>
+              <div className="premium-stats">
+                <div className="stat-row">
+                  <span>Deep Dives</span>
+                  <span className="stat-val">{deep_dives_remaining}</span>
+                </div>
+                <div className="stat-bar">
+                  <div className="stat-fill" style={{ width: `${(deep_dives_remaining/5)*100}%` }}></div>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="free-tier">
-              <p>Free Tier • Limited features</p>
+            <div className="free-card">
+              <div className="free-content">
+                <strong>Free Plan</strong>
+                <p>Upgrade for Deep Dives</p>
+              </div>
               <button 
-                className="btn btn-secondary btn-sm"
+                className="btn-upgrade"
                 onClick={() => setShowPricing(true)}
               >
-                Upgrade to Pro
+                Upgrade
               </button>
             </div>
           )}
         </div>
       </aside>
 
-      {/* Pricing Modal */}
+      {/* Modals */}
       <PricingModal 
         isOpen={showPricing}
         onClose={() => setShowPricing(false)}
-        onUpgrade={handleUpgradeSuccess}
+        onUpgrade={() => setShowPricing(false)}
+      />
+
+      <NewCaseModal
+        isOpen={isCaseModalOpen}
+        onClose={() => setIsCaseModalOpen(false)}
+        onSubmit={handleModalSubmit}
+        initialName={caseModalMode === 'rename' ? caseToRename?.name : ''}
+        mode={caseModalMode}
       />
     </>
   );

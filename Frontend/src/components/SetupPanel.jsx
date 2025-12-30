@@ -1,4 +1,17 @@
 import { useState, useEffect } from 'react';
+import { 
+  Play, 
+  Zap, 
+  UserPlus, 
+  Database, 
+  Code, 
+  Target, 
+  MessageSquare, 
+  List, 
+  X,
+  Plus,
+  Minus
+} from 'lucide-react';
 import { usePremium } from '../contexts/PremiumContext';
 import './SetupPanel.css';
 
@@ -25,8 +38,50 @@ const SetupPanel = ({
     responsePath: 'choices[0].message.content',
     numCases: 3,
     goal: 'Explain Indian income tax safely.',
-    oldPrompt: '',
-    newPrompt: '',
+    oldPrompt: `You are a cautious legal-information assistant for Indian income tax.
+
+You MUST:
+- Clearly list assumptions
+- Explain before concluding
+- Mention relevant edge cases
+- Avoid giving direct advice
+- Include a legal disclaimer
+
+Provide helpful, accurate information while being appropriately cautious about legal matters.`,
+    newPrompt: `You are an Indian income tax information assistant providing general guidance only.
+You are NOT a legal advisor or tax consultant.
+
+Core Principles:
+- State key assumptions clearly before answering
+- Use conditional language ("generally", "may", "depends on", "subject to")
+- Mention relevant exceptions or edge cases when applicable
+- Never invent specific rules, rates, section numbers, or time periods unless you are confident
+- If uncertain about any detail, explicitly acknowledge it
+
+Response Structure (follow this format):
+
+Assumptions:
+- List only what is strictly necessary to understand the context
+
+High-Level Explanation:
+- Provide conceptual explanation of the tax treatment
+- Focus on principles rather than absolute specifics
+
+What Depends on Facts:
+- Note the key variables that would change the answer
+- Mention any thresholds or conditions that matter
+
+Important Considerations:
+- Highlight 1-2 common misunderstandings if relevant
+- Note any edge cases or exceptions
+
+Next Steps:
+- Suggest what the user should do (typically: consult a tax professional for personalized advice)
+
+Disclaimer:
+- One brief line noting this is general information, not professional advice
+
+Remember: If you're uncertain about a specific rule, rate, or timeframe, say so explicitly. Clarity and accuracy matter more than completeness.`,
     questionsManual: ''
   });
   const [isRunning, setIsRunning] = useState(false);
@@ -35,12 +90,7 @@ const SetupPanel = ({
 
   // Debug: Show current premium status
   useEffect(() => {
-    console.log('SetupPanel - Premium status:', {
-      isPremium,
-      deepDivesRemaining,
-      premiumLoading,
-      localStorage: localStorage.getItem('premium_status')
-    });
+    // console.log('SetupPanel - Premium status:', { ... });
   }, [isPremium, deepDivesRemaining, premiumLoading]);
 
   // Load data from selected version
@@ -154,7 +204,6 @@ const SetupPanel = ({
           : []
       };
       
-      console.log('Sending inputs:', inputs);
       await onRunAnalysis(inputs);
     } catch (error) {
       alert(`Analysis failed: ${error.message}`);
@@ -166,52 +215,20 @@ const SetupPanel = ({
   const handleDeepDive = async () => {
     if (isRunning) return;
     
-    console.log('=== Deep Dive Check ===');
-    console.log('isPremium from context:', isPremium);
-    console.log('deepDivesRemaining:', deepDivesRemaining);
-    console.log('premiumLoading:', premiumLoading);
-    
     // Force refresh subscription status before checking
     try {
       const freshStatus = await checkSubscription();
-      console.log('Fresh subscription status:', freshStatus);
       
-      // Check the fresh status
       if (!freshStatus.is_premium) {
-        console.log('Not premium after refresh, checking localStorage...');
-        const cached = localStorage.getItem('premium_status');
-        console.log('localStorage premium_status:', cached);
-        
-        if (cached) {
-          try {
-            const data = JSON.parse(cached);
-            console.log('Parsed cache:', data);
-            
-            // Check if cache says pro
-            if (data.is_premium || data.tier === 'pro') {
-              console.log('Cache shows Pro but context does not. Reloading...');
-              alert('Detected Pro status. Refreshing to update UI...');
-              window.location.reload();
-              return;
-            }
-          } catch (e) {
-            console.error('Failed to parse cache:', e);
-          }
-        }
-        
-        // Still not premium, show upgrade prompt
         alert('You need to upgrade to Pro to use Deep Dive.');
         window.location.hash = '#pricing';
         return;
       }
       
-      // Check deep dives remaining
       if (freshStatus.deep_dives_remaining <= 0) {
         alert('No deep dives remaining for this month.');
         return;
       }
-      
-      console.log('All checks passed, proceeding with deep dive');
     } catch (error) {
       console.error('Failed to check subscription:', error);
       alert('Failed to verify subscription status. Please try again.');
@@ -221,20 +238,11 @@ const SetupPanel = ({
     setIsRunning(true);
     try {
       // Validate JSON
-      try {
-        JSON.parse(formData.envVars);
-      } catch (e) {
-        alert('Invalid JSON in Environment Variables');
-        setIsRunning(false);
-        return;
+      if (formData.envVars) {
+        try { JSON.parse(formData.envVars); } catch (e) { throw new Error('Invalid JSON in Environment Variables'); }
       }
-      
-      try {
-        JSON.parse(formData.bodyTemplate);
-      } catch (e) {
-        alert('Invalid JSON in Request Body Template');
-        setIsRunning(false);
-        return;
+      if (formData.bodyTemplate) {
+        try { JSON.parse(formData.bodyTemplate); } catch (e) { throw new Error('Invalid JSON in Request Body Template'); }
       }
       
       const hasManualQuestions = formData.questionsManual.trim().length > 0;
@@ -256,7 +264,6 @@ const SetupPanel = ({
           : []
       };
       
-      console.log('Sending deep dive inputs:', inputs);
       await onDeepDive(inputs);
     } catch (error) {
       alert(`Deep dive failed: ${error.message}`);
@@ -278,11 +285,6 @@ const SetupPanel = ({
     setActiveTab('manual');
   };
 
-  const forceRefreshPremium = () => {
-    localStorage.removeItem('premium_status');
-    window.location.reload();
-  };
-
   // Determine premium status for display
   const showPremiumUI = isPremium;
 
@@ -291,27 +293,6 @@ const SetupPanel = ({
       <div className="panel-header">
         <div className="panel-header-top">
           <h2>Evaluation Setup</h2>
-          <div className="premium-status-display">
-            {premiumLoading ? (
-              <span className="premium-loading">Checking status...</span>
-            ) : showPremiumUI ? (
-              <div className="premium-badge">
-                <span className="badge premium">✨ PRO</span>
-                <span className="dives-count">Deep Dives: {deepDivesRemaining}</span>
-              </div>
-            ) : (
-              <div className="free-badge">
-                <span className="badge free">Free Tier</span>
-                <button 
-                  className="btn-link debug-btn"
-                  onClick={() => setShowDebug(!showDebug)}
-                  title="Debug info"
-                >
-                  ⚙️
-                </button>
-              </div>
-            )}
-          </div>
         </div>
         
         <div className="collaboration-bar">
@@ -339,59 +320,22 @@ const SetupPanel = ({
             onClick={onInvite}
             disabled={!activeCase}
           >
+            <UserPlus size={14} />
             Invite
           </button>
         </div>
       </div>
 
-      {/* Debug Panel */}
-      {showDebug && (
-        <div className="debug-panel">
-          <div className="debug-header">
-            <h4>Debug Info</h4>
-            <button 
-              className="btn-icon"
-              onClick={() => setShowDebug(false)}
-            >
-              ✕
-            </button>
-          </div>
-          <div className="debug-content">
-            <p><strong>Context isPremium:</strong> {isPremium.toString()}</p>
-            <p><strong>Deep Dives:</strong> {deepDivesRemaining}</p>
-            <p><strong>localStorage:</strong> {localStorage.getItem('premium_status') || 'none'}</p>
-            <div className="debug-actions">
-              <button 
-                className="btn btn-sm btn-secondary"
-                onClick={forceRefreshPremium}
-              >
-                Force Refresh
-              </button>
-              <button 
-                className="btn btn-sm btn-secondary"
-                onClick={() => {
-                  // Force set to pro for testing
-                  const proData = {
-                    tier: 'pro',
-                    is_premium: true,
-                    deep_dives_remaining: 5
-                  };
-                  localStorage.setItem('premium_status', JSON.stringify(proData));
-                  window.location.reload();
-                }}
-              >
-                Set as Pro (test)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="panel-content-scroll">
         <div className="panel-content">
           {/* API Configuration */}
           <div className="section">
-            <h3>API Configuration</h3>
+            <div className="section-header">
+              <h3>
+                <Database size={16} />
+                API Configuration
+              </h3>
+            </div>
             <div className="input-grid">
               <div className="input-group">
                 <label>Old API URL</label>
@@ -418,7 +362,12 @@ const SetupPanel = ({
 
           {/* Request Configuration */}
           <div className="section">
-            <h3>Request Configuration</h3>
+            <div className="section-header">
+              <h3>
+                <Code size={16} />
+                Request Configuration
+              </h3>
+            </div>
             <div className="input-group">
               <label>Environment Variables (JSON)</label>
               <textarea
@@ -426,7 +375,7 @@ const SetupPanel = ({
                 onChange={(e) => handleInputChange('envVars', e.target.value)}
                 placeholder='{ "api_key": "your-key" }'
                 rows={4}
-                className="textarea-large"
+                className="textarea-large font-mono"
               />
               <div className="input-hint">
                 Use <code>{"{{question}}"}</code> for dynamic question insertion
@@ -440,7 +389,7 @@ const SetupPanel = ({
                 onChange={(e) => handleInputChange('bodyTemplate', e.target.value)}
                 placeholder='{ "prompt": "{{question}}" }'
                 rows={6}
-                className="textarea-large"
+                className="textarea-large font-mono"
               />
               <div className="input-hint">
                 Ensure template contains <code>{"{{question}}"}</code> placeholder
@@ -455,7 +404,7 @@ const SetupPanel = ({
                   value={formData.responsePath}
                   onChange={(e) => handleInputChange('responsePath', e.target.value)}
                   placeholder="choices[0].message.content"
-                  className="input-large"
+                  className="input-large font-mono"
                 />
                 <div className="input-hint">
                   JSON path to extract response
@@ -478,14 +427,14 @@ const SetupPanel = ({
                       className="number-btn"
                       onClick={() => handleInputChange('numCases', Math.max(1, parseInt(formData.numCases) - 1))}
                     >
-                      −
+                      <Minus size={14} />
                     </button>
                     <button 
                       type="button"
                       className="number-btn"
                       onClick={() => handleInputChange('numCases', Math.min(showPremiumUI ? 50 : 10, parseInt(formData.numCases) + 1))}
                     >
-                      +
+                      <Plus size={14} />
                     </button>
                   </div>
                 </div>
@@ -498,7 +447,12 @@ const SetupPanel = ({
 
           {/* System Goal & Prompts */}
           <div className="section">
-            <h3>System Configuration</h3>
+            <div className="section-header">
+              <h3>
+                <Target size={16} />
+                System Configuration
+              </h3>
+            </div>
             <div className="input-group">
               <label>System Goal</label>
               <textarea
@@ -537,7 +491,10 @@ const SetupPanel = ({
           {/* Test Cases */}
           <div className="section">
             <div className="section-header">
-              <h3>Test Cases</h3>
+              <h3>
+                <List size={16} />
+                Test Cases
+              </h3>
               <div className="tab-buttons">
                 <button
                   className={`tab-btn ${activeTab === 'auto' ? 'active' : ''}`}
@@ -585,21 +542,6 @@ const SetupPanel = ({
 
           {/* Action Buttons */}
           <div className="action-bar">
-            <button
-              className={`btn btn-primary ${isRunning ? 'loading' : ''}`}
-              onClick={handleRunAnalysis}
-              disabled={isRunning || !activeCase}
-            >
-              {isRunning ? (
-                <>
-                  <span className="spinner"></span>
-                  Running Analysis...
-                </>
-              ) : (
-                '⚡ Run Analysis'
-              )}
-            </button>
-
             {showPremiumUI ? (
               <button
                 className={`btn btn-premium ${isRunning ? 'loading' : ''}`}
@@ -612,7 +554,10 @@ const SetupPanel = ({
                     Running Deep Dive...
                   </>
                 ) : (
-                  `🔬 Deep Dive (${deepDivesRemaining} left)`
+                  <>
+                    <Zap size={18} />
+                    Deep Dive ({deepDivesRemaining} left)
+                  </>
                 )}
               </button>
             ) : (
@@ -628,6 +573,24 @@ const SetupPanel = ({
                 </p>
               </div>
             )}
+            
+            <button
+              className={`btn btn-primary ${isRunning ? 'loading' : ''}`}
+              onClick={handleRunAnalysis}
+              disabled={isRunning || !activeCase}
+            >
+              {isRunning ? (
+                <>
+                  <span className="spinner"></span>
+                  Running Analysis...
+                </>
+              ) : (
+                <>
+                  <Play size={18} />
+                  Run Analysis
+                </>
+              )}
+            </button>
 
             <span className="action-hint">
               Any change creates a new version
