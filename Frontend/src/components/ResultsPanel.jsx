@@ -676,9 +676,40 @@ const ResultsPanel = ({
                   </div>
                 )}
              </div>
-           ) : (
-             <p className="text-muted p-4">No comments yet.</p>
-           )}
+           ) : null}
+           
+           <div className="comment-input-wrapper mt-4 pt-4 border-t border-[var(--border-light)]">
+              <textarea
+                className="w-full text-sm p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-alt)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] resize-none"
+                rows="2"
+                placeholder="Add a comment..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (newComment.trim()) {
+                      onAddComment(newComment);
+                      setNewComment('');
+                    }
+                  }
+                }}
+              />
+              <div className="flex justify-end mt-2">
+                <button 
+                  className="btn btn-primary btn-sm px-4"
+                  disabled={!newComment.trim()}
+                  onClick={() => {
+                    if (newComment.trim()) {
+                      onAddComment(newComment);
+                      setNewComment('');
+                    }
+                  }}
+                >
+                  Post
+                </button>
+              </div>
+           </div>
         </div>
       </div>
     );
