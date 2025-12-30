@@ -170,13 +170,17 @@ export const apiService = {
   },
   
   runDeepDive: (payload) => {
-    const userId = localStorage.getItem('user_id');
-    return api.post('/api/deep-dive', {
-      ...payload,
-      user_id: userId
-    }).then(res => res.data);
-  },
+  const userId = localStorage.getItem('user_id');
   
+  // 🔍 DEBUG
+  console.log('🔥 API_BASE_URL:', API_BASE_URL);
+  console.log('🔥 Full URL will be:', `${API_BASE_URL}/api/deep-dive`);
+  
+  return api.post('/api/deep-dive', {
+    ...payload,
+    user_id: userId
+  }).then(res => res.data);
+},
   // Team & Collaboration
   fetchTeamMembers: (caseId) => {
     const userId = localStorage.getItem('user_id');

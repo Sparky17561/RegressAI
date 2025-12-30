@@ -774,7 +774,7 @@ async def deep_dive_analysis(req: AnalyzeRequest):
     if req.case_id:
         case = get_case(req.case_id, user_id)
         if not case:
-            raise HTTPException(status_code=404, detail="Case not found")
+            raise HTTPException(status_code=400, detail="Case not found")  # Changed from 404 to 400
     else:
         case = create_case(user_id, req.case_name or "Deep Dive", description=f"Deep Dive: {req.goal[:120]}")
 
