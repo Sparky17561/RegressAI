@@ -92,7 +92,7 @@ def _heuristic_fallback(issues, ...):
 
 ---
 
-## ⚙️ **Setup in 3 Minutes**
+## ⚙️ **Setup in 3 Minutes.**
 
 ### **Prerequisites**
 
